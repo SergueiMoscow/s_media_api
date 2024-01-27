@@ -1,0 +1,30 @@
+[MASTER]
+good-names=i,j,k,e,x,_,pk,id,rf
+max-module-lines=500
+output-format=colorized
+ignore=migrations
+load-plugins=pylint_django
+
+disable=C0412, # ungrouped-imports
+        E0213, # no-self-argument
+        R0903, # too-few-public-methods
+        R0914, # too-many-locals
+        C0114, # missing-module-docstring
+        C0115, # missing-class-docstring
+        C0116, # missing-function-docstring
+        E5110, # django-not-configured
+        E1101, # no-member, Disabled because of https://github.com/PyCQA/pylint-django/issues/110
+
+# Maximum number of nested code blocks for function / method
+max-nested-blocks=3
+# Maximum number of branch for function / method body
+max-branches=10
+# Maximum number of statements in function / method body
+max-statements=25
+# Maximum number of attributes for a class (see R0902).
+max-attributes=10
+# Maximum number of public methods for a class (see R0904).
+max-public-methods=10
+# Maximum arguments number for function / method
+max-args=8
+max-parents=11

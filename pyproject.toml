@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "s-media-api"
+version = "0.1.0"
+description = "API intermediary between Front-end and s_media_service"
+authors = ["Сергей Сушков <sushkov_sv@ursip.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+django = "^5.0.1"
+djangorestframework = "^3.14.0"
+requests = "^2.31.0"
+djangorestframework-simplejwt = "^5.3.1"
+pytest = "^7.4.4"
+pytest-django = "^4.7.0"
+pytest-factoryboy = "^2.6.0"
+django-cors-headers = "^4.3.1"
+pytest-cov = "^4.1.0"
+autoflake = "^2.2.1"
+isort = "^5.13.2"
+black = "^24.1.0"
+unify = "^0.5"
+flake8 = "^7.0.0"
+pylint-django = "^2.5.5"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+skip-string-normalization=true
