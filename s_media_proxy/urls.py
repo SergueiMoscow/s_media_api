@@ -10,7 +10,7 @@ from s_media_proxy.views import (
     ServerViewSet,
     StorageDetailViewSet,
     StorageListViewSet,
-    StorageViewSet,
+    StorageViewSet, StorageContentViewSet,
 )
 
 router = routers.DefaultRouter()
@@ -34,5 +34,11 @@ urlpatterns = [
         'storages/<int:server_id>/<uuid:storage_id>/',
         StorageViewSet.as_view(),
         name='storage-edit-delete',
+    ),
+    # storage content
+    path(
+        'storage/<int:server_id>/<uuid:storage_id>/',
+        StorageContentViewSet.as_view(),
+        name='get-storage-content',
     ),
 ]
