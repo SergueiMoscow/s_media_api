@@ -17,6 +17,18 @@ from s_media_proxy.serializers import GroupSerializer, ServerSerializer, UserSer
 from s_media_proxy.services import get_url_and_additional_data_for_request
 
 
+def fetch_storages(self, request, server: Server, endpoint: str) -> list:
+    url = f'{server.url}{endpoint}'
+    # try:
+    response = self._proxy_request(request_url=url, request=request, method='GET')
+    data = json.loads(response.content)
+    for storage in data['results']:
+        storage['server_id'] = server.id
+        storage['server_name'] = server.name
+        storage['server_url'] = server.url
+    return data
+
+
 class UserViewSet(viewsets.ModelViewSet):  # pylint: disable=too-few-public-methods
     """
     API endpoint that allows users to be viewed or edited.
@@ -66,28 +78,28 @@ class StorageListViewSet(APIView, ProxyViewMixin):
         user = request.user
         results = []
         server_id = request.query_params.get('server_id')
-        if server_id:
-            try:
-                server = get_server_by_id(int(server_id))
-                data = self.fetch_storages(request, server)
-            except (ValueError, ObjectDoesNotExist, AttributeError):
-                return Response({'error': 'Invalid server ID'}, status=400)
-            if data:
-                results.extend(data.get('results', []))
-        else:
-            servers = get_servers_by_user(user)
-            # Создаем `ThreadPoolExecutor` для асинхронных запросов к удаленным серверам
-            with ThreadPoolExecutor() as executor:
-                # Словарь для сопоставления 'future' с соответствующим URL сервера
-                future_to_url = {
-                    executor.submit(self.fetch_storages, request, server): server.url
-                    for server in servers
-                }
-                results = []
-                for future in as_completed(future_to_url):
-                    data = future.result()
-                    if data:
-                        results.extend(data.get('results', []))
+        # if server_id:
+        try:
+            server = get_server_by_id(int(server_id))
+            data = self.fetch_storages(request, server)
+        except (ValueError, ObjectDoesNotExist, AttributeError):
+            return Response({'error': 'Invalid server ID'}, status=400)
+        if data:
+            results.extend(data.get('results', []))
+        # else:
+        #     servers = get_servers_by_user(user)
+        #     # Создаем `ThreadPoolExecutor` для асинхронных запросов к удаленным серверам
+        #     with ThreadPoolExecutor() as executor:
+        #         # Словарь для сопоставления 'future' с соответствующим URL сервера
+        #         future_to_url = {
+        #             executor.submit(self.fetch_storages, request, server): server.url
+        #             for server in servers
+        #         }
+        #         results = []
+        #         for future in as_completed(future_to_url):
+        #             data = future.result()
+        #             if data:
+        #                 results.extend(data.get('results', []))
 
         return Response(
             {'status': 'success', 'count': len(results), 'results': results}
@@ -162,3 +174,41 @@ class StorageContentViewSet(APIView, ProxyViewMixin):
             server_id, storage_id, request
         )
         return self._proxy_request(request_url=url, request=request, method='GET')
+
+
+class ServersContentViewSet(APIView, ProxyViewMixin):
+    def get(self, request: Request):
+        user = request.user
+        servers = get_servers_by_user(user)
+        # Создаем `ThreadPoolExecutor` для асинхронных запросов к удаленным серверам
+        with ThreadPoolExecutor() as executor:
+            # Словарь для сопоставления 'future' с соответствующим URL сервера
+            future_to_url = {
+                executor.submit(self.fetch_storages, request, server): server.url
+                for server in servers
+            }
+            results = []
+            for future in as_completed(future_to_url):
+                data = future.result()
+                if data:
+                    results.extend(data.get('results', []))
+
+        return Response(
+            {'status': 'success', 'count': len(results), 'results': results}
+        )
+
+    def fetch_storages(self, request, server: Server) -> list:
+        url = f'{server.url}/storage/?user_id={request.user.public_id}'
+        # try:
+        response = self._proxy_request(request_url=url, request=request, method='GET')
+        data = json.loads(response.content)
+        if not data.get('results'):
+            raise NotFound(detail='Неверный путь')
+        for storage in data['results']:
+            storage['server_id'] = server.id
+            storage['server_name'] = server.name
+            storage['server_url'] = server.url
+        return data
+        # except Exception as e:
+        #     print(e)
+        #     return None
