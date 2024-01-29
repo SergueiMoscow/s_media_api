@@ -1,19 +1,21 @@
+import io
 import os
+import random
 
 from django.http import HttpResponse
+from PIL import Image
 from rest_framework.decorators import api_view
-from rest_framework.views import APIView
-
-from PIL import Image, ImageOps
-import io
-import numpy as np
-import random
-from typing import Callable, Optional
 
 from django_app.settings import BASE_DIR
 
 
-def get_image_position(image_width: int, image_height: int, canvas_width: int, canvas_height: int, min_percent: int) -> (int, int):
+def get_image_position(
+    image_width: int,
+    image_height: int,
+    canvas_width: int,
+    canvas_height: int,
+    min_percent: int,
+) -> (int, int):
     # Вычисление минимального и максимального значения для left
     left_min = 0 - (min_percent / 2) / 100 * image_width
     left_max = canvas_width - ((100 - min_percent) / 2) / 100 * image_width
@@ -30,8 +32,13 @@ def get_image_position(image_width: int, image_height: int, canvas_width: int, c
     return int(left), int(top)
 
 
-def get_image_size(image_width: int, image_height: int, canvas_width: int, canvas_height: int, min_percent: int) -> (
-int, int):
+def get_image_size(
+    image_width: int,
+    image_height: int,
+    canvas_width: int,
+    canvas_height: int,
+    min_percent: int,
+) -> (int, int):
     """
     Возвращает новые размеры изображения, чтобы они были не более min_percent % от размера холста.
     """
@@ -56,29 +63,38 @@ int, int):
     return round(new_width), round(new_height)
 
 
-def generate_image(src_img_path: str, max_images: int, width: int, height: int, min_percent_visible: int) -> bytes:
+def generate_image(
+    src_img_path: str,
+    max_images: int,
+    width: int,
+    height: int,
+    min_percent_visible: int,
+) -> bytes:
     # Открытие исходного изображения
     with Image.open(src_img_path) as src_img:
         # Меняем размеры (если нужно)
-        src_img = src_img.resize((get_image_size(src_img.width, src_img.height, width, height, 50)))
+        src_img = src_img.resize(
+            (get_image_size(src_img.width, src_img.height, width, height, 50))
+        )
 
         # Создание пустой канвы для результирующего изображения
         result_img = Image.new('RGB', (width, height), color=(255, 255, 255))
 
-        # Расчет минимального размера изображения, которое должно быть видно
-        min_visible_area = src_img.width * src_img.height * (min_percent_visible / 100)
-
         for _ in range(max_images):
             # Поворот случайным образом
-            angle = random.uniform(-90, 90)
+            angle = random.uniform(-70, 70)
             rotated = src_img.convert('RGBA').rotate(angle, expand=True)
 
             # Создаем маску для повернутого изображения
-            # mask = ImageOps.invert(rotated.convert('L'))
             mask = rotated.convert('RGBA')
-            # Выбираем случайное положение для вставки изображения так, чтобы было видно не менее min_percent_visible
             # Случайное положение
-            x_pos, y_pos = get_image_position(image_width=src_img.width, image_height=src_img.height, canvas_width=width, canvas_height=height, min_percent=min_percent_visible)
+            x_pos, y_pos = get_image_position(
+                image_width=rotated.width,
+                image_height=rotated.height,
+                canvas_width=width,
+                canvas_height=height,
+                min_percent=min_percent_visible,
+            )
             result_img.paste(rotated, (x_pos, y_pos), mask)
 
         # Сохранение результата в байты
@@ -112,10 +128,9 @@ def generate_image(src_img_path: str, max_images: int, width: int, height: int, 
 def generate_folders_image(request):
     folders = request.GET.get('folders')
     max_images = int(folders)
-    width = 200  # Замените на реальное значение при необходимости
-    height = 100  # Замените на реальное значение при необходимости
-    min_percent_visible = 50  # Замените на реальное значение при необходимости
-    # src_img_path: str, max_images: int, width: int, height: int, min_percent_visible: int
+    width = 200
+    height = 100
+    min_percent_visible = 20
     source_image = os.path.join(BASE_DIR, 'images/folder.png')
     print(source_image)
     img_bytes = generate_image(
@@ -126,4 +141,4 @@ def generate_folders_image(request):
         min_percent_visible=min_percent_visible,
     )
 
-    return HttpResponse(img_bytes, content_type="image/png")
+    return HttpResponse(img_bytes, content_type='image/png')

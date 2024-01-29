@@ -7,7 +7,7 @@ from s_media_proxy.repository import get_server_by_id
 
 
 def get_url_and_additional_data_for_request(
-        server_id: int, storage_id: uuid.UUID, request: Request
+    server_id: int, storage_id: uuid.UUID, request: Request
 ) -> tuple:
     server = get_server_by_id(server_id)
     if server is None:

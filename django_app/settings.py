@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     's_media_proxy',
     # other apps
     'corsheaders',
-    "drf_standardized_errors",
+    'drf_standardized_errors',
 ]
 
 MIDDLEWARE = [
@@ -137,7 +137,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    "EXCEPTION_HANDLER": "drf_standardized_errors.handler.exception_handler"
+    'EXCEPTION_HANDLER': 'drf_standardized_errors.handler.exception_handler',
 }
 
 SIMPLE_JWT = {

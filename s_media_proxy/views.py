@@ -17,18 +17,6 @@ from s_media_proxy.serializers import GroupSerializer, ServerSerializer, UserSer
 from s_media_proxy.services import get_url_and_additional_data_for_request
 
 
-def fetch_storages(self, request, server: Server, endpoint: str) -> list:
-    url = f'{server.url}{endpoint}'
-    # try:
-    response = self._proxy_request(request_url=url, request=request, method='GET')
-    data = json.loads(response.content)
-    for storage in data['results']:
-        storage['server_id'] = server.id
-        storage['server_name'] = server.name
-        storage['server_url'] = server.url
-    return data
-
-
 class UserViewSet(viewsets.ModelViewSet):  # pylint: disable=too-few-public-methods
     """
     API endpoint that allows users to be viewed or edited.
@@ -75,7 +63,6 @@ class StorageListViewSet(APIView, ProxyViewMixin):
     timeout_proxy_request = 5
 
     def get(self, request: Request):
-        user = request.user
         results = []
         server_id = request.query_params.get('server_id')
         # if server_id:
@@ -162,17 +149,13 @@ class StorageViewSet(APIView, ProxyViewMixin):
         )
 
     def delete(self, request: Request, server_id: int, storage_id: uuid.UUID):
-        url, _ = get_url_and_additional_data_for_request(
-            server_id, storage_id, request
-        )
+        url, _ = get_url_and_additional_data_for_request(server_id, storage_id, request)
         return self._proxy_request(request_url=url, request=request, method='DELETE')
 
 
 class StorageContentViewSet(APIView, ProxyViewMixin):
     def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
-        url, additional_data = get_url_and_additional_data_for_request(
-            server_id, storage_id, request
-        )
+        url, _ = get_url_and_additional_data_for_request(server_id, storage_id, request)
         return self._proxy_request(request_url=url, request=request, method='GET')
 
 
@@ -184,7 +167,10 @@ class ServersContentViewSet(APIView, ProxyViewMixin):
         # Создаем `ThreadPoolExecutor` для асинхронных запросов к удаленным серверам
         with ThreadPoolExecutor() as executor:
             # Словарь для сопоставления 'future' с соответствующим URL сервера
-            futures = {executor.submit(self.fetch_storages, request, server): server for server in servers}
+            futures = {
+                executor.submit(self.fetch_storages, request, server): server
+                for server in servers
+            }
             for future in as_completed(futures):
                 server = futures[future]
                 data = future.result()
@@ -193,7 +179,8 @@ class ServersContentViewSet(APIView, ProxyViewMixin):
                         item['server_id'] = server.id
                         item['server_name'] = server.name
                         results.append(item)
-                    # TODO: Удалить эту строку, она добавляет ещё один result для вида, как это будет расположено на странице.
+                    # TO_DO: Удалить эту строку, она добавляет ещё один result для вида,
+                    #  как это будет расположено на странице.
                     results.extend(data.get('results', []))
 
         return Response(
