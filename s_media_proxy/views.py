@@ -180,17 +180,20 @@ class ServersContentViewSet(APIView, ProxyViewMixin):
     def get(self, request: Request):
         user = request.user
         servers = get_servers_by_user(user)
+        results = []
         # Создаем `ThreadPoolExecutor` для асинхронных запросов к удаленным серверам
         with ThreadPoolExecutor() as executor:
             # Словарь для сопоставления 'future' с соответствующим URL сервера
-            future_to_url = {
-                executor.submit(self.fetch_storages, request, server): server.url
-                for server in servers
-            }
-            results = []
-            for future in as_completed(future_to_url):
+            futures = {executor.submit(self.fetch_storages, request, server): server for server in servers}
+            for future in as_completed(futures):
+                server = futures[future]
                 data = future.result()
                 if data:
+                    for item in data.get('results', []):
+                        item['server_id'] = server.id
+                        item['server_name'] = server.name
+                        results.append(item)
+                    # TODO: Удалить эту строку, она добавляет ещё один result для вида, как это будет расположено на странице.
                     results.extend(data.get('results', []))
 
         return Response(

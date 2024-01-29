@@ -23,6 +23,8 @@ unify = "^0.5"
 flake8 = "^7.0.0"
 pylint-django = "^2.5.5"
 drf-standardized-errors = "^0.12.6"
+pillow = "^10.2.0"
+numpy = "^1.26.3"
 
 
 [build-system]

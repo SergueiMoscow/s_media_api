@@ -6,6 +6,8 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
+from s_media_proxy.image_generator import generate_folders_image
+from s_media_proxy.image_generator2 import generate_folders_image2
 from s_media_proxy.views import (
     ServerViewSet,
     StorageDetailViewSet,
@@ -46,4 +48,5 @@ urlpatterns = [
         StorageContentViewSet.as_view(),
         name='get-storage-content',
     ),
+    path('folders_image', generate_folders_image, name='generate_folders_image'),
 ]
