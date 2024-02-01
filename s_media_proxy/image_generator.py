@@ -74,7 +74,8 @@ def generate_image(
     with Image.open(src_img_path) as src_img:
         # Меняем размеры (если нужно)
         src_img = src_img.resize(
-            (get_image_size(src_img.width, src_img.height, width, height, 50))
+            (get_image_size(src_img.width, src_img.height, width, height, 50)),
+            resample=Image.Resampling.HAMMING,
         )
 
         # Создание пустой канвы для результирующего изображения

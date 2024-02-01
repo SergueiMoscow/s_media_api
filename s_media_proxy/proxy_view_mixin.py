@@ -2,6 +2,7 @@ import uuid
 from abc import ABC
 
 import requests
+from django.contrib.auth.models import AnonymousUser
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
 from django.http import HttpResponse
 from rest_framework.request import Request
@@ -23,8 +24,12 @@ class ProxyViewMixin(ABC):
         # request_url = request.get_full_path()
         if data is None:
             data = {}
+        if isinstance(request.user, AnonymousUser):
+            user_id = ''
+        else:
+            user_id = str(request.user.public_id)
         request_header = {
-            'X-USER-ID': str(request.user.public_id),
+            'X-USER-ID': user_id,
             'X-REQUEST-ID': str(uuid.uuid4()),
         }
         if data is None:

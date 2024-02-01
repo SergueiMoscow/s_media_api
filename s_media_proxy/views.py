@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import api_view
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -202,3 +203,24 @@ class ServersContentViewSet(APIView, ProxyViewMixin):
         # except Exception as e:
         #     print(e)
         #     return None
+
+
+class CollageViewSet(APIView, ProxyViewMixin):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
+        url, additional_data = self.get_url_and_additional_data_for_request(server_id, storage_id)
+
+        return self._proxy_request(request_url=url, request=request, method='GET', json_data=additional_data, data=additional_data)
+
+    def get_url_and_additional_data_for_request(
+        self,
+        server_id: int,
+        storage_id: uuid.UUID,
+    ) -> tuple:
+        server = get_server_by_id(server_id)
+        if server is None:
+            raise NotFound(detail='Server not found')
+        url = f'{server.url}/storage/collage/{storage_id}?folder='
+        additional_data = {}
+        return url, additional_data
