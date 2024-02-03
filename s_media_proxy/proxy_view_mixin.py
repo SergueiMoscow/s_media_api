@@ -9,7 +9,7 @@ from rest_framework.request import Request
 
 
 class ProxyViewMixin(ABC):
-    timeout_proxy_request: int = 5
+    timeout_proxy_request: int = 30
 
     def _proxy_request(
         self,

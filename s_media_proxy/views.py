@@ -156,8 +156,21 @@ class StorageViewSet(APIView, ProxyViewMixin):
 
 class StorageContentViewSet(APIView, ProxyViewMixin):
     def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
-        url, _ = get_url_and_additional_data_for_request(server_id, storage_id, request)
+        url, _ = self.get_url_and_additional_data_for_request(server_id, storage_id)
         return self._proxy_request(request_url=url, request=request, method='GET')
+
+    def get_url_and_additional_data_for_request(
+        self,
+        server_id: int,
+        storage_id: uuid.UUID,
+        # request: Request
+    ) -> tuple:
+        server = get_server_by_id(server_id)
+        if server is None:
+            raise NotFound(detail='Server not found')
+        url = f'{server.url}/storage/{storage_id}'
+        additional_data = {'user_id': str(self.request.user.public_id)}
+        return url, additional_data
 
 
 class ServersContentViewSet(APIView, ProxyViewMixin):
@@ -185,7 +198,7 @@ class ServersContentViewSet(APIView, ProxyViewMixin):
                     results.extend(data.get('results', []))
 
         return Response(
-            {'status': 'success', 'count': len(results), 'results': results}
+            {'status': 'success', 'count': len(results), 'results': {'folders': results}}
         )
 
     def fetch_storages(self, request, server: Server) -> list:
