@@ -234,6 +234,7 @@ class CollageViewSet(APIView, ProxyViewMixin):
         server = get_server_by_id(server_id)
         if server is None:
             raise NotFound(detail='Server not found')
-        url = f'{server.url}/storage/collage/{storage_id}?folder='
+        folder = self.request.GET.get('folder', '')
+        url = f'{server.url}/storage/collage/{storage_id}?folder={folder}'
         additional_data = {}
         return url, additional_data
