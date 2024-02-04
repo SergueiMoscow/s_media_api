@@ -13,7 +13,7 @@ from s_media_proxy.views import (
     StorageContentViewSet,
     StorageDetailViewSet,
     StorageListViewSet,
-    StorageViewSet, CollageViewSet,
+    StorageViewSet, CollageViewSet, FilePreviewViewSet,
 )
 
 router = routers.DefaultRouter()
@@ -51,4 +51,5 @@ urlpatterns = [
     ),
     path('folders_image', generate_folders_image, name='generate_folders_image'),
     path('folder_collage/<int:server_id>/<uuid:storage_id>/', CollageViewSet.as_view(), name='folder_collage'),
+    path('preview/<int:server_id>/<uuid:storage_id>/', FilePreviewViewSet.as_view(), name='file_preview'),
 ]

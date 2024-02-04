@@ -238,3 +238,23 @@ class CollageViewSet(APIView, ProxyViewMixin):
         url = f'{server.url}/storage/collage/{storage_id}?folder={folder}'
         additional_data = {}
         return url, additional_data
+
+
+class FilePreviewViewSet(APIView, ProxyViewMixin):
+    def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
+        url, additional_data = self.get_url_and_additional_data_for_request(server_id, storage_id)
+        return self._proxy_request(request_url=url, request=request, method='GET', json_data=additional_data, data=additional_data)
+
+    def get_url_and_additional_data_for_request(
+        self,
+        server_id: int,
+        storage_id: uuid.UUID,
+    ) -> tuple:
+        server = get_server_by_id(server_id)
+        if server is None:
+            raise NotFound(detail='Server not found')
+        folder = self.request.GET.get('folder', '')
+        filename = self.request.GET.get('filename', '')
+        url = f'{server.url}/storage/file/{storage_id}?folder={folder}&filename={filename}'
+        additional_data = {}
+        return url, additional_data
