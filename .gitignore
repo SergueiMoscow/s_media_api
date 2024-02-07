@@ -3,3 +3,8 @@ readme.sss
 .env
 *.sqlite3
 readme.sss
+inventory.ini
+
+playbook.yml
+Dockerfile
+docker-compose.yml

@@ -25,6 +25,7 @@ pylint-django = "^2.5.5"
 drf-standardized-errors = "^0.12.6"
 pillow = "^10.2.0"
 numpy = "^1.26.3"
+environs = {extras = ["django"], version = "^10.3.0"}
 
 
 [build-system]
