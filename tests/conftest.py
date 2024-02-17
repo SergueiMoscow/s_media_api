@@ -33,7 +33,7 @@ def authorized_client(auth_user):
 
 @pytest.fixture
 def mock_created_server(faker):
-    with patch('s_media_proxy.views.get_server_by_id') as mock:
+    with patch('django.db.models.QuerySet.first') as mock:
         server = Server(
             id=faker.random_int(),
             name='test server',

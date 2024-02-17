@@ -7,14 +7,9 @@ from rest_framework_simplejwt.views import (
 )
 
 from s_media_proxy.image_generator import generate_folders_image
-from s_media_proxy.views import (
-    ServersContentViewSet,
-    ServerViewSet,
-    StorageContentViewSet,
-    StorageDetailViewSet,
-    StorageListViewSet,
-    StorageViewSet, CollageViewSet, FilePreviewViewSet,
-)
+from s_media_proxy.storage_views import StorageListViewSet, StorageDetailViewSet, StorageViewSet, StorageContentViewSet, \
+    ServersContentViewSet, CollageViewSet, FilePreviewViewSet
+from s_media_proxy.servers_views import ServerViewSet
 
 router = routers.DefaultRouter()
 router.register(r'servers', ServerViewSet, basename='server')
