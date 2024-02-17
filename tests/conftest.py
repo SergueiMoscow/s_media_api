@@ -32,12 +32,13 @@ def authorized_client(auth_user):
 
 
 @pytest.fixture
-def mock_created_server(faker):
+def mock_created_server(faker, auth_user):
     with patch('django.db.models.QuerySet.first') as mock:
         server = Server(
             id=faker.random_int(),
             name='test server',
             url='http://test',
+            user_id=auth_user.id,
         )
         mock.return_value = server
         yield mock
@@ -48,3 +49,14 @@ def mock_request(get_fake_response):
     with patch('requests.request') as mock:
         mock.return_value = get_fake_response
         yield mock
+
+
+@pytest.fixture
+def created_user_and_server(auth_user):
+    server = Server(
+        user=auth_user,
+        name='test server',
+        url='http://test.com'
+    )
+    server.save()
+    return server

@@ -142,9 +142,6 @@ class ServersContentViewSet(APIView, ProxyViewMixin):
                         item['server_id'] = server.id
                         item['server_name'] = server.name
                         results.append(item)
-                    # TO_DO: Удалить эту строку, она добавляет ещё один result для вида,
-                    #  как это будет расположено на странице.
-                    results.extend(data.get('results', []))
 
         return Response(
             {'status': 'success', 'count': len(results), 'results': {'folders': results}}
