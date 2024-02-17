@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from datetime import timedelta
 from pathlib import Path
+
 from environs import Env
 from marshmallow.validate import OneOf
 
@@ -83,12 +84,15 @@ WSGI_APPLICATION = 'django_app.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-if env(
-    'DATABASE_ENGINE',
-    validate=OneOf(
-        ["sqlite", "postgresql"], error="DATABASE_ENGINE must be one of: {choices}"
-    ),
-) == 'sqlite':
+if (
+    env(
+        'DATABASE_ENGINE',
+        validate=OneOf(
+            ['sqlite', 'postgresql'], error='DATABASE_ENGINE must be one of: {choices}'
+        ),
+    )
+    == 'sqlite'
+):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -96,11 +100,12 @@ if env(
         }
     }
 else:
+    database_schema = env('DATABASE_SCHEMA')
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql_psycopg2',
             'NAME': env('DATABASE_NAME'),
-            'OPTIONS': {'options': f'-c search_path={env("DATABASE_SCHEMA")}'},
+            'OPTIONS': {'options': f'-c search_path={database_schema}'},
             'USER': env('DATABASE_USER'),
             'PASSWORD': env('DATABASE_PASSWORD'),
             'HOST': env('DATABASE_HOST'),

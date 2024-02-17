@@ -104,9 +104,7 @@ class StorageContentViewSet(APIView, ProxyViewMixin):
         for folder in content['folders']:
             folder['server_id'] = server_id
             folder['storage_id'] = storage_id
-        return Response(
-            {'status': 'success', 'results': content}
-        )
+        return Response({'status': 'success', 'results': content})
 
     def get_url_and_additional_data_for_request(
         self,
@@ -144,7 +142,11 @@ class ServersContentViewSet(APIView, ProxyViewMixin):
                         results.append(item)
 
         return Response(
-            {'status': 'success', 'count': len(results), 'results': {'folders': results}}
+            {
+                'status': 'success',
+                'count': len(results),
+                'results': {'folders': results},
+            }
         )
 
     def fetch_storages(self, request, server: Server) -> list:
@@ -168,9 +170,17 @@ class CollageViewSet(APIView, ProxyViewMixin):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
-        url, additional_data = self.get_url_and_additional_data_for_request(server_id, storage_id)
+        url, additional_data = self.get_url_and_additional_data_for_request(
+            server_id, storage_id
+        )
 
-        return self._proxy_request(request_url=url, request=request, method='GET', json_data=additional_data, data=additional_data)
+        return self._proxy_request(
+            request_url=url,
+            request=request,
+            method='GET',
+            json_data=additional_data,
+            data=additional_data,
+        )
 
     def get_url_and_additional_data_for_request(
         self,
@@ -188,8 +198,16 @@ class CollageViewSet(APIView, ProxyViewMixin):
 
 class FilePreviewViewSet(APIView, ProxyViewMixin):
     def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
-        url, additional_data = self.get_url_and_additional_data_for_request(server_id, storage_id)
-        return self._proxy_request(request_url=url, request=request, method='GET', json_data=additional_data, data=additional_data)
+        url, additional_data = self.get_url_and_additional_data_for_request(
+            server_id, storage_id
+        )
+        return self._proxy_request(
+            request_url=url,
+            request=request,
+            method='GET',
+            json_data=additional_data,
+            data=additional_data,
+        )
 
     def get_url_and_additional_data_for_request(
         self,

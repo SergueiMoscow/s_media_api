@@ -7,9 +7,16 @@ from rest_framework_simplejwt.views import (
 )
 
 from s_media_proxy.image_generator import generate_folders_image
-from s_media_proxy.storage_views import StorageListViewSet, StorageDetailViewSet, StorageViewSet, StorageContentViewSet, \
-    ServersContentViewSet, CollageViewSet, FilePreviewViewSet
 from s_media_proxy.servers_views import ServerViewSet
+from s_media_proxy.storage_views import (
+    CollageViewSet,
+    FilePreviewViewSet,
+    ServersContentViewSet,
+    StorageContentViewSet,
+    StorageDetailViewSet,
+    StorageListViewSet,
+    StorageViewSet,
+)
 
 router = routers.DefaultRouter()
 router.register(r'servers', ServerViewSet, basename='server')
@@ -45,6 +52,14 @@ urlpatterns = [
         name='get-storage-content',
     ),
     path('folders_image', generate_folders_image, name='generate_folders_image'),
-    path('folder_collage/<int:server_id>/<uuid:storage_id>/', CollageViewSet.as_view(), name='folder_collage'),
-    path('preview/<int:server_id>/<uuid:storage_id>/', FilePreviewViewSet.as_view(), name='file_preview'),
+    path(
+        'folder_collage/<int:server_id>/<uuid:storage_id>/',
+        CollageViewSet.as_view(),
+        name='folder_collage',
+    ),
+    path(
+        'preview/<int:server_id>/<uuid:storage_id>/',
+        FilePreviewViewSet.as_view(),
+        name='file_preview',
+    ),
 ]

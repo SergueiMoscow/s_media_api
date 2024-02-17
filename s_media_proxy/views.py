@@ -23,5 +23,3 @@ class GroupViewSet(viewsets.ModelViewSet):  # pylint: disable=too-few-public-met
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
     permission_classes = [permissions.IsAuthenticated]
-
-
