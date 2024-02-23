@@ -73,7 +73,7 @@ urlpatterns = [
     ),
     # Tags
     path(
-        'storage/tags/<int:server_id>/',
+        'catalog/tags/<int:server_id>/',
         ServerTags.as_view(),
         name='server_tags',
     ),
