@@ -7,7 +7,7 @@ from s_media_proxy.proxy_view_mixin import ProxyViewMixin
 class ServerTags(BaseAPIView, ProxyViewMixin):
     def get(self, request: Request, server_id: int):
         self.get_additional_data(server_id=server_id)
-        url = f'{self.server.url}/storage/tags'
+        url = f'{self.server.url}/catalog/tags'
         result = self._proxy_request(
             method='GET',
             request_url=url,
