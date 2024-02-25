@@ -1,3 +1,5 @@
+from typing import List
+
 from s_media_proxy.models import Server, User
 
 
@@ -13,3 +15,7 @@ def get_server_by_id(server_id: int) -> Server:
 
 def delete_server(server_id: int) -> bool:
     return Server.objects.delete(id=server_id)
+
+
+def get_all_servers(max_count: int = 10) -> List[Server]:
+    return Server.objects.all()[:max_count]

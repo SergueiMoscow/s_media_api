@@ -18,7 +18,7 @@ def auth_user():
 @pytest.fixture
 def get_fake_response(faker):
     class FakeResponse:
-        content = faker.word()
+        content = '{"files": [{"created_at": ""}]}'
         status_code = 200
         headers = {'Content-Type': 'application/json'}
     return FakeResponse
@@ -37,7 +37,7 @@ def mock_created_server(faker, auth_user):
         server = Server(
             id=faker.random_int(),
             name='test server',
-            url='http://test',
+            url=faker.bothify(text='/test_##'),
             user_id=auth_user.id,
         )
         mock.return_value = server
@@ -60,3 +60,15 @@ def created_user_and_server(auth_user):
     )
     server.save()
     return server
+
+
+@pytest.fixture
+def created_multiple_servers(auth_user, faker):
+    count_servers = faker.random_int(min=2, max=10)
+    servers = [Server(
+        user=auth_user,
+        name=faker.bothify(text='test server #####'),
+        url=f'http://{faker.word()}_test.com'
+    ) for _ in range(count_servers)]
+    Server.objects.bulk_create(servers)
+    yield servers

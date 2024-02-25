@@ -1,11 +1,18 @@
+import json
+import os
 import uuid
+from operator import itemgetter
+from urllib.parse import urljoin
 
+from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from s_media_proxy.models import Server
 from s_media_proxy.proxy_view_mixin import ProxyViewMixin
-from s_media_proxy.repository import get_server_by_id
+from s_media_proxy.repository import get_server_by_id, get_all_servers
 
 
 class BaseAPIView(APIView):
@@ -63,3 +70,36 @@ class CatalogFileViewSet(BaseAPIView, ProxyViewMixin):
             json_data=additional_data,
         )
         return result
+
+
+class MainPageViewSet(APIView, ProxyViewMixin):
+    def get(self, request: Request):
+        servers = get_all_servers()
+        if len(servers) == 0:
+            raise NotFound(detail="No servers found")
+
+        files = []
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            result = executor.map(self.fetch_data, servers)
+        for res in result:
+            files.extend(res)
+        if len(files) == 0:
+            raise NotFound(detail="No files found")
+        sorted_files = sorted(files, key=itemgetter('created_at'), reverse=True)  # сортировка по created_at
+        return Response(
+            {
+                'status': 'success',
+                'count': len(files),
+                'results': {'files': sorted_files},
+            }
+        )
+
+    def fetch_data(self, server: Server):
+        request_url = urljoin(server.url, '/catalog/main')
+        response = self._proxy_request(
+            method='GET',
+            request_url=request_url,
+            request=self.request,
+        )
+        data = json.loads(response.content)
+        return data['files']

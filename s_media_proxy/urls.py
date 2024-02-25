@@ -6,7 +6,7 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
-from s_media_proxy.file_views import CatalogFileViewSet
+from s_media_proxy.file_views import CatalogFileViewSet, MainPageViewSet
 from s_media_proxy.image_generator import generate_folders_image
 from s_media_proxy.servers_views import ServerViewSet
 from s_media_proxy.storage_views import (
@@ -77,4 +77,11 @@ urlpatterns = [
         ServerTags.as_view(),
         name='server_tags',
     ),
+    # main page
+    path(
+        'main/',
+        MainPageViewSet.as_view(),
+        name='main',
+    ),
+
 ]
