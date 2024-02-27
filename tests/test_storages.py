@@ -183,7 +183,7 @@ def test_get_folder_collage_ok(authorized_client, mock_created_server, mock_requ
 
 
 @pytest.mark.django_db
-def test_get_file_preview_ok(authorized_client, mock_created_server, mock_request):
+def test_get_file_preview_by_storage_folder_and_filename_ok(authorized_client, mock_created_server, mock_request):
     server_id = mock_created_server.return_value.id
     storage_id = uuid.uuid4()
     folder = 'test_folder'
@@ -197,6 +197,28 @@ def test_get_file_preview_ok(authorized_client, mock_created_server, mock_reques
     mock_request.assert_called_once_with(
         'GET',
         f'{mock_created_server.return_value.url}/storage/file/{storage_id}?folder={folder}&filename={filename}',
+        data={},
+        files=ANY,
+        json={},
+        headers=ANY,
+        timeout=ANY,
+        verify=True,
+    )
+
+
+@pytest.mark.django_db
+def test_get_file_preview_by_file_id_ok(authorized_client, mock_created_server, mock_request):
+    server_id = mock_created_server.return_value.id
+    file_id = uuid.uuid4()
+    url = f'/preview/{server_id}/{file_id}/'
+    params = {}
+    mock_request.return_value.content = '{"results":[{}]}'
+    response = authorized_client.get(url, params, format='json')
+
+    assert response.status_code == 200
+    mock_request.assert_called_once_with(
+        'GET',
+        f'{mock_created_server.return_value.url}/catalog/file/{file_id}',
         data={},
         files=ANY,
         json={},

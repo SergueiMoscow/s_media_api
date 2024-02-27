@@ -9,6 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from s_media_proxy.file_views import BaseAPIView
 from s_media_proxy.models import Server
 from s_media_proxy.proxy_view_mixin import ProxyViewMixin
 from s_media_proxy.repository import get_server_by_id, get_servers_by_user
@@ -196,11 +197,18 @@ class CollageViewSet(APIView, ProxyViewMixin):
         return url, additional_data
 
 
-class FilePreviewViewSet(APIView, ProxyViewMixin):
+class FilePreviewViewSet(BaseAPIView, ProxyViewMixin):
     def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
-        url, additional_data = self.get_url_and_additional_data_for_request(
-            server_id, storage_id
-        )
+        if request.GET.get('filename'):
+            # Запрос на storage_id + folder + filename
+            self.get_additional_data(server_id=server_id, storage_id=storage_id)
+            url = f'{self.server.url}/storage/file/{storage_id}?folder={self.folder}&filename={self.filename}'
+        else:
+            # Запрос на catalog по file_id.
+            file_id = storage_id
+            self.get_additional_data(server_id=server_id)
+            url = f'{self.server.url}/catalog/file/{file_id}'
+        additional_data = {}
         return self._proxy_request(
             request_url=url,
             request=request,
@@ -209,16 +217,16 @@ class FilePreviewViewSet(APIView, ProxyViewMixin):
             data=additional_data,
         )
 
-    def get_url_and_additional_data_for_request(
-        self,
-        server_id: int,
-        storage_id: uuid.UUID,
-    ) -> tuple:
-        server = get_server_by_id(server_id)
-        if server is None:
-            raise NotFound(detail='Server not found')
-        folder = self.request.GET.get('folder', '')
-        filename = self.request.GET.get('filename', '')
-        url = f'{server.url}/storage/file/{storage_id}?folder={folder}&filename={filename}'
-        additional_data = {}
-        return url, additional_data
+    # def get_url_and_additional_data_for_request(
+    #     self,
+    #     server_id: int,
+    #     storage_id: uuid.UUID,
+    # ) -> tuple:
+    #     server = get_server_by_id(server_id)
+    #     if server is None:
+    #         raise NotFound(detail='Server not found')
+    #     folder = self.request.GET.get('folder', '')
+    #     filename = self.request.GET.get('filename', '')
+    #     url = f'{server.url}/storage/file/{storage_id}?folder={folder}&filename={filename}'
+    #     additional_data = {}
+    #     return url, additional_data

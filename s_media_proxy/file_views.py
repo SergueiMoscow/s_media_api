@@ -30,10 +30,12 @@ class BaseAPIView(APIView):
             self.server = get_server_by_id(kwargs['server_id'])
         if kwargs.get('storage_id'):
             self.storage_id = kwargs['storage_id']
-        if self.request.data.get('folder'):
-            self.folder = self.request.data.get('folder')
-        if self.request.data.get('filename'):
-            self.folder = self.request.data.get('filename')
+        folder = self.request.data.get('folder') or self.request.GET.get('folder')
+        if folder:
+            self.folder = folder
+        filename = self.request.data.get('filename') or self.request.GET.get('filename')
+        if filename:
+            self.filename = filename
         self._get_client_ip()
 
     def _get_client_ip(self):
@@ -102,4 +104,6 @@ class MainPageViewSet(APIView, ProxyViewMixin):
             request=self.request,
         )
         data = json.loads(response.content)
+        for file in data['files']:
+            file['server_id'] = server.id
         return data['files']
