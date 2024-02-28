@@ -8,6 +8,7 @@ from rest_framework_simplejwt.views import (
 
 from s_media_proxy.file_views import CatalogFileViewSet, MainPageViewSet
 from s_media_proxy.image_generator import generate_folders_image
+from s_media_proxy.profile_view import UserProfileViewSet
 from s_media_proxy.servers_views import ServerViewSet
 from s_media_proxy.storage_views import (
     CollageViewSet,
@@ -22,6 +23,7 @@ from s_media_proxy.tag_views import ServerTags
 
 router = routers.DefaultRouter()
 router.register(r'servers', ServerViewSet, basename='server')
+router.register(r'profile', UserProfileViewSet, basename='profile')
 
 # Wire up our API using automatic URL routing.
 # Additionally, we include login URLs for the browsable API.
