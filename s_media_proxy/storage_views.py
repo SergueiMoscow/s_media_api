@@ -27,7 +27,11 @@ class StorageListViewSet(APIView, ProxyViewMixin):
             server = get_server_by_id(int(server_id))
             data = self.fetch_storages(request, server)
         except (ValueError, ObjectDoesNotExist, AttributeError):
-            return Response({'error': 'Invalid server ID'}, status=400)
+            # return Response({'error': 'Invalid server ID'}, status=400)
+            # Если хранилище не найдено, ошибку не возвращать
+            return Response(
+                {'status': 'success', 'count': 0, 'results':  []}
+            )
         if data:
             results.extend(data.get('results', []))
 
@@ -97,6 +101,7 @@ class StorageViewSet(APIView, ProxyViewMixin):
 
 
 class StorageContentViewSet(APIView, ProxyViewMixin):
+    # Переделать наследоваться от BaseAPIView
     def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
         url, _ = self.get_url_and_additional_data_for_request(server_id, storage_id)
         response = self._proxy_request(request_url=url, request=request, method='GET')
@@ -122,6 +127,7 @@ class StorageContentViewSet(APIView, ProxyViewMixin):
 
 
 class ServersContentViewSet(APIView, ProxyViewMixin):
+    # Переделать наследоваться от BaseAPIView
     def get(self, request: Request):
         user = request.user
         servers = get_servers_by_user(user)
@@ -168,6 +174,7 @@ class ServersContentViewSet(APIView, ProxyViewMixin):
 
 
 class CollageViewSet(APIView, ProxyViewMixin):
+    # Переделать как наследника от BaseAPIView
     permission_classes = [permissions.AllowAny]
 
     def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
@@ -216,17 +223,3 @@ class FilePreviewViewSet(BaseAPIView, ProxyViewMixin):
             json_data=additional_data,
             data=additional_data,
         )
-
-    # def get_url_and_additional_data_for_request(
-    #     self,
-    #     server_id: int,
-    #     storage_id: uuid.UUID,
-    # ) -> tuple:
-    #     server = get_server_by_id(server_id)
-    #     if server is None:
-    #         raise NotFound(detail='Server not found')
-    #     folder = self.request.GET.get('folder', '')
-    #     filename = self.request.GET.get('filename', '')
-    #     url = f'{server.url}/storage/file/{storage_id}?folder={folder}&filename={filename}'
-    #     additional_data = {}
-    #     return url, additional_data
