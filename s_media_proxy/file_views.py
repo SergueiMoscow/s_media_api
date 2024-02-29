@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from s_media_proxy.models import Server
 from s_media_proxy.proxy_view_mixin import ProxyViewMixin
-from s_media_proxy.repository import get_server_by_id, get_all_servers
+from s_media_proxy.repository import get_server_by_id, get_all_servers, get_distinct_server_urls, get_server_by_url
 
 
 class BaseAPIView(APIView):
@@ -76,13 +76,13 @@ class CatalogFileViewSet(BaseAPIView, ProxyViewMixin):
 
 class MainPageViewSet(APIView, ProxyViewMixin):
     def get(self, request: Request):
-        servers = get_all_servers()
-        if len(servers) == 0:
+        servers_urls = get_distinct_server_urls()
+        if len(servers_urls) == 0:
             raise NotFound(detail="No servers found")
 
         files = []
         with ThreadPoolExecutor(max_workers=5) as executor:
-            result = executor.map(self.fetch_data, servers)
+            result = executor.map(self.fetch_data, servers_urls)
         for res in result:
             files.extend(res)
         if len(files) == 0:
@@ -96,14 +96,15 @@ class MainPageViewSet(APIView, ProxyViewMixin):
             }
         )
 
-    def fetch_data(self, server: Server):
-        request_url = urljoin(server.url, '/catalog/main')
+    def fetch_data(self, server_url: str):
+        request_url = urljoin(server_url, '/catalog/main')
         response = self._proxy_request(
             method='GET',
             request_url=request_url,
             request=self.request,
         )
         data = json.loads(response.content)
+        server = get_server_by_url(server_url)
         for file in data['files']:
             file['server_id'] = server.id
         return data['files']

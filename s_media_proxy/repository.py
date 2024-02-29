@@ -19,3 +19,12 @@ def delete_server(server_id: int) -> bool:
 
 def get_all_servers(max_count: int = 10) -> List[Server]:
     return Server.objects.all()[:max_count]
+
+
+def get_distinct_server_urls(max_count: int = 10) -> List[str]:
+    distinct_urls = Server.objects.values_list('url', flat=True).distinct()[:max_count]
+    return list(distinct_urls)
+
+
+def get_server_by_url(url: str) -> Server:
+    return Server.objects.filter(url=url).first()
