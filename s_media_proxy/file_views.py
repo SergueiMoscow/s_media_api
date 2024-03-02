@@ -30,7 +30,7 @@ class BaseAPIView(APIView):
             self.server = get_server_by_id(kwargs['server_id'])
         if kwargs.get('storage_id'):
             self.storage_id = kwargs['storage_id']
-        folder = self.request.data.get('folder') or self.request.GET.get('folder')
+        folder = self.request.data.get('folder') or self.request.GET.get('folder') or None
         if folder:
             self.folder = folder
         filename = self.request.data.get('filename') or self.request.GET.get('filename')
