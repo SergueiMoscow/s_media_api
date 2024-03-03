@@ -24,6 +24,7 @@ def test_get_image_size():
     assert new_height == 150
 
 
+@pytest.mark.django_db
 @pytest.mark.parametrize('num_folders', (2, 3, 5, 10))
 def test_generate_folders_image(client, num_folders):
     response = client.get(f'/folders_image?folders={num_folders}')

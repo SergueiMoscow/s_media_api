@@ -1,6 +1,6 @@
 import os
 import uuid
-from unittest.mock import ANY
+from unittest.mock import ANY, patch
 
 import pytest
 from rest_framework import status

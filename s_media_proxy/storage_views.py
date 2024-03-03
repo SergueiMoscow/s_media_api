@@ -101,10 +101,10 @@ class StorageViewSet(APIView, ProxyViewMixin):
 
 
 class StorageContentViewSet(BaseAPIView, ProxyViewMixin):
-    # Переделать наследоваться от BaseAPIView
+
     def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
         self.get_additional_data(server_id=server_id, storage_id=storage_id)
-        url = f'{self.server.url}/storage/{storage_id}?folder={self.folder}&page={self.request.GET.get("page")}'
+        url = f'{self.server.url}/storage/{storage_id}?folder={self.folder}&page={self.request.GET.get("page", "")}'
         response = self._proxy_request(request_url=url, request=request, method='GET')
         try:
             content = json.loads(response.content)
@@ -116,50 +116,6 @@ class StorageContentViewSet(BaseAPIView, ProxyViewMixin):
             folder['server_id'] = server_id
             folder['storage_id'] = storage_id
         return Response({'status': 'success', 'results': results, 'pagination': pagination})
-
-    def get_url_and_additional_data_for_request_DELETE(
-        self,
-        server_id: int,
-        storage_id: uuid.UUID,
-    ) -> tuple:
-        server = get_server_by_id(server_id)
-        folder = self.request.GET.get('folder', '')
-        if server is None:
-            raise NotFound(detail='Server not found')
-        url = f'{server.url}/storage/{storage_id}?folder={folder}'
-        additional_data = {'user_id': str(self.request.user.public_id)}
-        return url, additional_data
-
-
-
-class StorageContentViewSet_DELETE(APIView, ProxyViewMixin):
-    # Переделать наследоваться от BaseAPIView
-    def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
-        url, _ = self.get_url_and_additional_data_for_request(server_id, storage_id)
-        response = self._proxy_request(request_url=url, request=request, method='GET')
-        try:
-            content = json.loads(response.content)
-        except Exception as e:
-            pass
-        results = content['results']
-        pagination = content['pagination']
-        for folder in results['folders']:
-            folder['server_id'] = server_id
-            folder['storage_id'] = storage_id
-        return Response({'status': 'success', 'results': results, 'pagination': pagination})
-
-    def get_url_and_additional_data_for_request(
-        self,
-        server_id: int,
-        storage_id: uuid.UUID,
-    ) -> tuple:
-        server = get_server_by_id(server_id)
-        folder = self.request.GET.get('folder', '')
-        if server is None:
-            raise NotFound(detail='Server not found')
-        url = f'{server.url}/storage/{storage_id}?folder={folder}'
-        additional_data = {'user_id': str(self.request.user.public_id)}
-        return url, additional_data
 
 
 class ServersContentViewSet(APIView, ProxyViewMixin):

@@ -1,18 +1,21 @@
 import json
-import os
+import logging
 import uuid
-from operator import itemgetter
 from urllib.parse import urljoin
 
+from django.db import transaction
 from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 from s_media_proxy.models import Server
 from s_media_proxy.proxy_view_mixin import ProxyViewMixin
-from s_media_proxy.repository import get_server_by_id, get_all_servers, get_distinct_server_urls, get_server_by_url
+from s_media_proxy.repository import get_server_by_id, get_distinct_server_urls, get_server_by_url, get_all_servers
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 class BaseAPIView(APIView):
@@ -21,7 +24,7 @@ class BaseAPIView(APIView):
         super().__init__(**kwargs)
         self.server = None
         self.storage_id = None
-        self.folder = None
+        self.folder = ''
         self.filename = None
         self.ip = None
 
@@ -75,36 +78,49 @@ class CatalogFileViewSet(BaseAPIView, ProxyViewMixin):
 
 
 class MainPageViewSet(APIView, ProxyViewMixin):
+
+    @transaction.non_atomic_requests
     def get(self, request: Request):
-        servers_urls = get_distinct_server_urls()
-        if len(servers_urls) == 0:
+        servers = self.get_distinct_servers()
+        if not servers:
             raise NotFound(detail="No servers found")
 
         files = []
         with ThreadPoolExecutor(max_workers=5) as executor:
-            result = executor.map(self.fetch_data, servers_urls)
+            result = executor.map(self.fetch_data, servers)
         for res in result:
             files.extend(res)
         if len(files) == 0:
             raise NotFound(detail="No files found")
-        sorted_files = sorted(files, key=itemgetter('created_at'), reverse=True)  # сортировка по created_at
-        return Response(
-            {
-                'status': 'success',
-                'count': len(files),
-                'results': {'files': sorted_files},
-            }
-        )
+        # sorted_files = sorted(files, key=itemgetter('created_at'), reverse=True)  # сортировка по created_at
+        files.sort(key=lambda file: file['created_at'], reverse=True)
+        response = Response({
+            'status': 'success',
+            'count': len(files),
+            'results': {'files': files},
+        })
+        return response
 
-    def fetch_data(self, server_url: str):
-        request_url = urljoin(server_url, '/catalog/main')
+    def get_distinct_servers(self):
+        all_servers = get_all_servers()
+        urls = {server.url: server for server in all_servers}
+        return list(urls.values())
+
+    @transaction.non_atomic_requests
+    def fetch_data(self, server: Server):
+        request_url = urljoin(server.url, '/catalog/main')
+        logger.info(f'file_views.py: fetching {server.url}')
         response = self._proxy_request(
             method='GET',
             request_url=request_url,
             request=self.request,
         )
         data = json.loads(response.content)
-        server = get_server_by_url(server_url)
+        counter = 0
         for file in data['files']:
             file['server_id'] = server.id
+            counter += 1
+            if counter > 10:
+                pass
+        logger.info(f'file_views.py: end fetching {server.url}')
         return data['files']

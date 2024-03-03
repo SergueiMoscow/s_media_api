@@ -120,7 +120,7 @@ def test_get_storage_content_ok(authorized_client, mock_created_server, mock_req
     url = f'/storage/{server_id}/{storage_id}/'
 
     # Создаем пример ответа, который будет возвращать наш объект ответа
-    mock_request.return_value.content = '{"results":{"folders": []}}'
+    mock_request.return_value.content = '{"results":{"folders": []}, "pagination":{}}'
 
     response = authorized_client.get(url, format='json')
 
@@ -130,7 +130,7 @@ def test_get_storage_content_ok(authorized_client, mock_created_server, mock_req
     # Проверяем, что был вызван mock_request с ожидаемыми параметрами
     mock_request.assert_called_once_with(
         'GET',
-        f'{mock_created_server.return_value.url}/storage/{storage_id}?folder=',
+        f'{mock_created_server.return_value.url}/storage/{storage_id}?folder=&page=',
         data=ANY,
         files=ANY,
         json=ANY,
