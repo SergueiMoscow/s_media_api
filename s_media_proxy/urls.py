@@ -17,7 +17,7 @@ from s_media_proxy.storage_views import (
     StorageContentViewSet,
     StorageDetailViewSet,
     StorageListViewSet,
-    StorageViewSet,
+    StorageViewSet, FileViewSet,
 )
 from s_media_proxy.tag_views import ServerTags
 
@@ -66,6 +66,11 @@ urlpatterns = [
     path(
         'preview/<int:server_id>/<uuid:storage_id>/',
         FilePreviewViewSet.as_view(),
+        name='file_preview',
+    ),
+    path(
+        'file/<int:server_id>/<uuid:storage_id>/',
+        FileViewSet.as_view(),
         name='file_preview',
     ),
     path(

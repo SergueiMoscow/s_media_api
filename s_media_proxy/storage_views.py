@@ -115,6 +115,11 @@ class StorageContentViewSet(BaseAPIView, ProxyViewMixin):
         for folder in results['folders']:
             folder['server_id'] = server_id
             folder['storage_id'] = storage_id
+        # Подставить owner
+        server = get_server_by_id(server_id)
+        for file in results['files']:
+            file['user_id'] = server.user.id
+            file['user_name'] = server.user.username
         return Response({'status': 'success', 'results': results, 'pagination': pagination})
 
 
@@ -196,22 +201,34 @@ class CollageViewSet(APIView, ProxyViewMixin):
         return url, additional_data
 
 
-class FilePreviewViewSet(BaseAPIView, ProxyViewMixin):
+class BaseFileViewSet(BaseAPIView, ProxyViewMixin):
+
+    action_path = ''
+
     def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
         if request.GET.get('filename'):
             # Запрос на storage_id + folder + filename
             self.get_additional_data(server_id=server_id, storage_id=storage_id)
-            url = f'{self.server.url}/storage/file/{storage_id}?folder={self.folder}&filename={self.filename}'
+            url = f'{self.server.url}/storage/{self.action_path}/{storage_id}?folder={self.folder}&filename={self.filename}'
         else:
             # Запрос на catalog по file_id.
             file_id = storage_id
             self.get_additional_data(server_id=server_id)
-            url = f'{self.server.url}/catalog/file/{file_id}'
+            url = f'{self.server.url}/catalog/{self.action_path}/{file_id}'
         additional_data = {}
-        return self._proxy_request(
+        response = self._proxy_request(
             request_url=url,
             request=request,
             method='GET',
             json_data=additional_data,
             data=additional_data,
         )
+        return response
+
+
+class FilePreviewViewSet(BaseFileViewSet):
+    action_path = 'preview'
+
+
+class FileViewSet(BaseFileViewSet):
+    action_path = 'file'

@@ -196,7 +196,7 @@ def test_get_file_preview_by_storage_folder_and_filename_ok(authorized_client, m
     assert response.status_code == 200
     mock_request.assert_called_once_with(
         'GET',
-        f'{mock_created_server.return_value.url}/storage/file/{storage_id}?folder={folder}&filename={filename}',
+        f'{mock_created_server.return_value.url}/storage/preview/{storage_id}?folder={folder}&filename={filename}',
         data={},
         files=ANY,
         json={},
@@ -218,7 +218,7 @@ def test_get_file_preview_by_file_id_ok(authorized_client, mock_created_server, 
     assert response.status_code == 200
     mock_request.assert_called_once_with(
         'GET',
-        f'{mock_created_server.return_value.url}/catalog/file/{file_id}',
+        f'{mock_created_server.return_value.url}/catalog/preview/{file_id}',
         data={},
         files=ANY,
         json={},
