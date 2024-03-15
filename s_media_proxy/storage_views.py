@@ -21,25 +21,32 @@ class StorageListViewSet(APIView, ProxyViewMixin):
 
     def get(self, request: Request):
         results = []
+        errors = []
         server_id = request.query_params.get('server_id')
-        # if server_id:
-        try:
-            server = get_server_by_id(int(server_id))
-            data = self.fetch_storages(request, server)
-        except (ValueError, ObjectDoesNotExist, AttributeError):
-            # return Response({'error': 'Invalid server ID'}, status=400)
-            # Если хранилище не найдено, ошибку не возвращать
-            return Response(
-                {'status': 'success', 'count': 0, 'results':  []}
-            )
-        if data:
-            results.extend(data.get('results', []))
+        if server_id:
+            try:
+                server = get_server_by_id(int(server_id))
+                data = self.fetch_storages(request, server)
+                if data:
+                    results.extend(data.get('results', []))
+            except (ValueError, ObjectDoesNotExist, AttributeError):
+                # Если хранилище не найдено, ошибку не возвращать
+                return Response(
+                    {'status': 'success', 'count': 0, 'results':  []}
+                )
+        else:
+            servers = get_servers_by_user(request.user)
+            for server in servers:
+                try:
+                    data = self.fetch_storages(request, server)
+                    if data:
+                        results.extend(data.get('results', []))
+                except Exception as e:  # Ловим ошибки при получении стораджей с сервера
+                    errors.append({'server_id': server.id, 'error': str(e)})
 
-        return Response(
-            {'status': 'success', 'count': len(results), 'results': results}
-        )
+        return Response({'status': 'success', 'count': len(results), 'results': results, 'errors': errors})
 
-    def fetch_storages(self, request, server: Server) -> list:
+    def fetch_storages(self, request, server: Server) -> dict:
         url = f'{server.url}/storages/'
         # try:
         response = self._proxy_request(request_url=url, request=request, method='GET')

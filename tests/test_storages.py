@@ -120,7 +120,7 @@ def test_get_storage_content_ok(authorized_client, mock_created_server, mock_req
     url = f'/storage/{server_id}/{storage_id}/'
 
     # Создаем пример ответа, который будет возвращать наш объект ответа
-    mock_request.return_value.content = '{"results":{"folders": []}, "pagination":{}}'
+    mock_request.return_value.content = '{"results":{"folders": [], "files":{}}, "pagination":{}}'
 
     response = authorized_client.get(url, format='json')
 

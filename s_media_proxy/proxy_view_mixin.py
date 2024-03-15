@@ -46,8 +46,8 @@ class ProxyViewMixin(ABC):
         }
         if data is None:
             data = {}
-        if json_data is None:
-            json_data = {}
+        if json_data is None or method.lower() in ('GET', 'DELETE'):
+            json_data = None
 
         if 'multipart/form-data' in request.content_type:
             for key, value in request.data.items():
@@ -55,7 +55,7 @@ class ProxyViewMixin(ABC):
                     continue
                 data[key] = value
 
-        if 'application/json' in request.content_type and not request.FILES:
+        if 'application/json' in request.content_type and not request.FILES and not method.lower() in ('GET', 'DELETE'):
             json_data.update(request.data)
 
         # Логгируем детали запроса перед его выполнением

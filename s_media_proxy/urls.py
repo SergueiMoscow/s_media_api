@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
+from s_media_proxy.catalog_views import CatalogContentViewSet
 from s_media_proxy.file_views import CatalogFileViewSet, MainPageViewSet
 from s_media_proxy.image_generator import generate_folders_image
 from s_media_proxy.profile_view import UserProfileViewSet
@@ -88,6 +89,11 @@ urlpatterns = [
     path(
         'main/',
         MainPageViewSet.as_view(),
+        name='main',
+    ),
+    path(
+        'catalog_content/<int:server_id>/<uuid:storage_id>/',
+        CatalogContentViewSet.as_view(),
         name='main',
     ),
 
