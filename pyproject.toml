@@ -29,6 +29,7 @@ environs = {extras = ["django"], version = "^10.3.0"}
 uvicorn = "^0.27.0.post1"
 poetry = "^1.7.1"
 psycopg2 = "^2.9.9"
+gunicorn = "^23.0.0"
 
 
 [build-system]
