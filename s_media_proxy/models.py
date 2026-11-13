@@ -13,6 +13,12 @@ class Server(models.Model):
     name = models.CharField(verbose_name='Title', max_length=20)
     url = models.URLField(verbose_name='URL', blank=False, max_length=128)
     can_add = models.BooleanField(verbose_name='Can add', default=False)
+    analyzer_url = models.URLField(
+        verbose_name='Analyzer URL', blank=True, null=True, max_length=128
+    )
+    analyzer_api_key = models.CharField(
+        verbose_name='Analyzer API key', blank=True, default='', max_length=128
+    )
     created_at = models.DateField(verbose_name='Created', auto_now_add=True)
 
     objects = models.Manager()

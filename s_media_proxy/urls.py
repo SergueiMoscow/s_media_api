@@ -8,6 +8,7 @@ from rest_framework_simplejwt.views import (
 
 from s_media_proxy.image_generator import generate_folders_image
 from s_media_proxy.servers_views import ServerViewSet
+from s_media_proxy.views.analyzer_views import AnalyzerProxyView
 from s_media_proxy.views.catalog_views import CatalogContentViewSet
 from s_media_proxy.views.file_views import CatalogFileViewSet, MainPageViewSet
 from s_media_proxy.views.profile_view import UserProfileViewSet
@@ -98,5 +99,14 @@ urlpatterns = [
         name='main',
     ),
     path('upload', upload_file, name='upload_file'),
-
+    path(
+        'analyzer/<int:server_id>/',
+        AnalyzerProxyView.as_view(),
+        name='analyzer_root',
+    ),
+    path(
+        'analyzer/<int:server_id>/<path:analyzer_path>',
+        AnalyzerProxyView.as_view(),
+        name='analyzer_proxy',
+    ),
 ]

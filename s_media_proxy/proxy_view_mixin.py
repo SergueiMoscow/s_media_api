@@ -32,6 +32,7 @@ class ProxyViewMixin(ABC):
         json_data=None,
         timeout: int = None,
         verify: bool = True,
+        api_key: str = None,
     ):
         # request_url = request.get_full_path()
         if data is None:
@@ -44,6 +45,8 @@ class ProxyViewMixin(ABC):
             'X-USER-ID': user_id,
             'X-REQUEST-ID': str(uuid.uuid4()),
         }
+        if api_key:
+            request_header['X-API-Key'] = api_key
         if data is None:
             data = {}
         if json_data is None or method.lower() in ('GET', 'DELETE'):
