@@ -12,6 +12,7 @@ class Server(models.Model):
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     name = models.CharField(verbose_name='Title', max_length=20)
     url = models.URLField(verbose_name='URL', blank=False, max_length=128)
+    can_add = models.BooleanField(verbose_name='Can add', default=False)
     created_at = models.DateField(verbose_name='Created', auto_now_add=True)
 
     objects = models.Manager()

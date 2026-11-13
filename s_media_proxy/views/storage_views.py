@@ -9,7 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from s_media_proxy.file_views import BaseAPIView
+from s_media_proxy.views.file_views import BaseAPIView
 from s_media_proxy.models import Server
 from s_media_proxy.proxy_view_mixin import ProxyViewMixin
 from s_media_proxy.repository import get_server_by_id, get_servers_by_user

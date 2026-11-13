@@ -6,12 +6,12 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
-from s_media_proxy.catalog_views import CatalogContentViewSet
-from s_media_proxy.file_views import CatalogFileViewSet, MainPageViewSet
 from s_media_proxy.image_generator import generate_folders_image
-from s_media_proxy.profile_view import UserProfileViewSet
 from s_media_proxy.servers_views import ServerViewSet
-from s_media_proxy.storage_views import (
+from s_media_proxy.views.catalog_views import CatalogContentViewSet
+from s_media_proxy.views.file_views import CatalogFileViewSet, MainPageViewSet
+from s_media_proxy.views.profile_view import UserProfileViewSet
+from s_media_proxy.views.storage_views import (
     CollageViewSet,
     FilePreviewViewSet,
     ServersContentViewSet,
@@ -20,7 +20,8 @@ from s_media_proxy.storage_views import (
     StorageListViewSet,
     StorageViewSet, FileViewSet,
 )
-from s_media_proxy.tag_views import ServerTags
+from s_media_proxy.views.tag_views import ServerTags
+from s_media_proxy.views.upload_view import upload_file
 
 router = routers.DefaultRouter()
 router.register(r'servers', ServerViewSet, basename='server')
@@ -96,5 +97,6 @@ urlpatterns = [
         CatalogContentViewSet.as_view(),
         name='main',
     ),
+    path('upload', upload_file, name='upload_file'),
 
 ]

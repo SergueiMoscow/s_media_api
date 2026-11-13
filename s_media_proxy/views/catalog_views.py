@@ -5,7 +5,7 @@ import uuid
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from s_media_proxy.file_views import BaseAPIView
+from s_media_proxy.views.file_views import BaseAPIView
 from s_media_proxy.proxy_view_mixin import ProxyViewMixin
 
 

@@ -198,6 +198,8 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
 ]
 
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+
 # Или для разрешения конкретных доменов:
 # CORS_ALLOWED_ORIGINS = [
 #     'http://localhost:3002',
