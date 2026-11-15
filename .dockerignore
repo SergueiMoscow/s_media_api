@@ -1,0 +1,14 @@
+.git
+.gitignore
+.idea
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+htmlcov
+*.sqlite3
+.env
+staticfiles
+.venv
+deploy
+docker-compose.yml
