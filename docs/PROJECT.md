@@ -133,6 +133,8 @@ docs/                  # PROJECT.md, INTEGRATION.md
 | `GET /catalog_content/<server_id>/<storage_id>/` | содержимое каталога |
 | `POST /upload?server_id=...` | загрузка файла (требует `can_add` у узла) |
 | `/analyzer/<server_id>/` и `/analyzer/<server_id>/<path:analyzer_path>` | универсальный прокси в `s_media_analyzer` |
+| `GET /analyzer/<server_id>/stats` | статус воркера анализатора (сводка) |
+| `GET /analyzer/<server_id>/queue` | детальная очередь обработки анализатора |
 | `/admin/` | Django admin |
 | `/api-auth/` | browsable API login (DRF) |
 
