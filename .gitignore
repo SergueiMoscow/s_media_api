@@ -3,7 +3,7 @@ readme.sss
 .env
 *.sqlite3
 inventory.ini
-docs/
+docs/prompt*.md
 
 playbook.yml
 .coverage/
