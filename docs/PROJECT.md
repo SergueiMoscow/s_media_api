@@ -99,6 +99,10 @@ docs/                  # PROJECT.md, INTEGRATION.md
 - `timeout` — берётся из атрибута вьюхи `timeout_proxy_request` (по умолчанию 60).
 - `verify` — по умолчанию `True` (self-signed сертификаты узлов — см.
   подводные камни).
+- `connection.close()` — перед блокирующим `requests.request` закрывается соединение
+  к БД, чтобы не удерживать его на время прокси-вызова (защита от исчерпания
+  `max_connections` при множестве параллельных запросов, например миниатюр
+  анализатора). Соединение переоткрывается лениво при следующем обращении к ORM.
 
 Универсальный прокси в анализатор — `AnalyzerProxyView`
 (`s_media_proxy/views/analyzer_views.py`): поддерживает GET/POST/PUT/PATCH/DELETE

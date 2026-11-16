@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
@@ -121,3 +123,25 @@ def test_analyzer_proxy_forwards_patch(
     assert call[0][0] == 'PATCH'
     assert call[0][1] == 'http://analyzer.test:8000/faces/1'
     assert call[1]['json'] == body
+
+
+@pytest.mark.django_db
+def test_proxy_closes_db_connection_before_http_request(
+    mock_request, authorized_client, server_with_analyzer
+):
+    """Соединение к БД не должно удерживаться на время блокирующего прокси-вызова."""
+    events = []
+    original_return = mock_request.return_value
+
+    def record_http_request(*args, **kwargs):
+        events.append('http_request')
+        return original_return
+
+    mock_request.side_effect = record_http_request
+
+    with patch('django.db.connection.close') as mock_close:
+        mock_close.side_effect = lambda: events.append('db_close')
+        response = authorized_client.get(_proxy_url(server_with_analyzer.id))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert events == ['db_close', 'http_request']

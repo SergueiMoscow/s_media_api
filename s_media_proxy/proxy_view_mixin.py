@@ -5,6 +5,7 @@ from abc import ABC
 import requests
 from django.contrib.auth.models import AnonymousUser
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
+from django.db import connection
 from django.http import HttpResponse
 from rest_framework.request import Request
 
@@ -71,6 +72,11 @@ class ProxyViewMixin(ABC):
             logger.debug(f'Proxy request json data: {json_data}')
         if request.FILES:
             logger.debug('Proxy request has files')
+
+        # Закрываем соединение к БД перед блокирующим HTTP-запросом к узлу,
+        # чтобы не удерживать соединение Postgres на время прокси-вызова.
+        # Соединение переоткроется лениво при следующем обращении к ORM.
+        connection.close()
 
         proxy_response = requests.request(
             method,
