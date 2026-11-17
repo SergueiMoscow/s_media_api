@@ -34,6 +34,7 @@ class ProxyViewMixin(ABC):
         timeout: int = None,
         verify: bool = True,
         api_key: str = None,
+        forward_request_body: bool = True,
     ):
         # request_url = request.get_full_path()
         if data is None:
@@ -53,14 +54,19 @@ class ProxyViewMixin(ABC):
         if json_data is None or method.lower() in ('GET', 'DELETE'):
             json_data = None
 
-        if 'multipart/form-data' in request.content_type:
-            for key, value in request.data.items():
-                if isinstance(value, (InMemoryUploadedFile, TemporaryUploadedFile)):
-                    continue
-                data[key] = value
+        if forward_request_body:
+            if 'multipart/form-data' in request.content_type:
+                for key, value in request.data.items():
+                    if isinstance(value, (InMemoryUploadedFile, TemporaryUploadedFile)):
+                        continue
+                    data[key] = value
 
-        if 'application/json' in request.content_type and not request.FILES and not method.lower() in ('GET', 'DELETE'):
-            json_data.update(request.data)
+            if (
+                'application/json' in request.content_type
+                and not request.FILES
+                and not method.lower() in ('GET', 'DELETE')
+            ):
+                json_data.update(request.data)
 
         # Логгируем детали запроса перед его выполнением
         logger.info(f'Proxy request: {method} {request_url}')

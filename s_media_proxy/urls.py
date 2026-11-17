@@ -11,6 +11,12 @@ from s_media_proxy.servers_views import ServerViewSet
 from s_media_proxy.views.analyzer_views import AnalyzerProxyView
 from s_media_proxy.views.catalog_views import CatalogContentViewSet
 from s_media_proxy.views.file_views import CatalogFileViewSet, MainPageViewSet
+from s_media_proxy.views.membership_views import (
+    ClusterPromoteView,
+    ClusterUnpromoteView,
+    FacePromoteView,
+    FaceUnpromoteView,
+)
 from s_media_proxy.views.profile_view import UserProfileViewSet
 from s_media_proxy.views.storage_views import (
     CollageViewSet,
@@ -99,6 +105,27 @@ urlpatterns = [
         name='main',
     ),
     path('upload', upload_file, name='upload_file'),
+    # Catalog membership orchestration (promote/unpromote) — before generic analyzer proxy
+    path(
+        'analyzer/<int:server_id>/clusters/<int:cluster_id>/promote',
+        ClusterPromoteView.as_view(),
+        name='cluster_promote',
+    ),
+    path(
+        'analyzer/<int:server_id>/clusters/<int:cluster_id>/unpromote',
+        ClusterUnpromoteView.as_view(),
+        name='cluster_unpromote',
+    ),
+    path(
+        'analyzer/<int:server_id>/faces/<int:face_id>/promote',
+        FacePromoteView.as_view(),
+        name='face_promote',
+    ),
+    path(
+        'analyzer/<int:server_id>/faces/<int:face_id>/unpromote',
+        FaceUnpromoteView.as_view(),
+        name='face_unpromote',
+    ),
     path(
         'analyzer/<int:server_id>/',
         AnalyzerProxyView.as_view(),

@@ -139,6 +139,10 @@ docs/                  # PROJECT.md, INTEGRATION.md
 | `/analyzer/<server_id>/` и `/analyzer/<server_id>/<path:analyzer_path>` | универсальный прокси в `s_media_analyzer` |
 | `GET /analyzer/<server_id>/stats` | статус воркера анализатора (сводка) |
 | `GET /analyzer/<server_id>/queue` | детальная очередь обработки анализатора |
+| `POST /analyzer/<server_id>/clusters/<cluster_id>/promote` | добавить файлы кластера в каталог (оркестрация) |
+| `POST /analyzer/<server_id>/clusters/<cluster_id>/unpromote` | убрать файлы кластера из каталога (оркестрация) |
+| `POST /analyzer/<server_id>/faces/<face_id>/promote` | добавить файл лица в каталог (оркестрация) |
+| `POST /analyzer/<server_id>/faces/<face_id>/unpromote` | убрать файл лица из каталога (оркестрация) |
 | `/admin/` | Django admin |
 | `/api-auth/` | browsable API login (DRF) |
 
