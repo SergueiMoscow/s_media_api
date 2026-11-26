@@ -19,6 +19,9 @@ class Server(models.Model):
     analyzer_api_key = models.CharField(
         verbose_name='Analyzer API key', blank=True, default='', max_length=128
     )
+    service_api_key = models.CharField(
+        verbose_name='Service API key', blank=True, default='', max_length=128
+    )
     created_at = models.DateField(verbose_name='Created', auto_now_add=True)
 
     objects = models.Manager()

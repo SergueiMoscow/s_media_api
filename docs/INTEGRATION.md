@@ -15,7 +15,7 @@
 
 | Сервис | Порт | Аутентификация | Что делает |
 | --- | --- | --- | --- |
-| `s_media_service` (FastAPI) | 8081 | `X-USER-ID` (+ поле `key` в теле на запись) | каталог фото/видео, storages, теги, fileinfo, upload |
+| `s_media_service` (FastAPI) | 8081 | `X-USER-ID` + `X-API-Key` | каталог фото/видео, storages, теги, fileinfo, upload |
 | `s_media_analyzer` (FastAPI) | 8000 | `X-API-Key` (+ принимает `X-USER-ID`) | лица, кластеры, геотеги; пишет только в схему `analysis` |
 
 ---
@@ -29,6 +29,7 @@
 | `url` | базовый URL **s_media_service** (`http://<host>:8081`) |
 | `analyzer_url` | базовый URL **s_media_analyzer** (`http://<host>:8000`); пусто — анализатор не настроен |
 | `analyzer_api_key` | ключ для заголовка `X-API-Key` к анализатору |
+| `service_api_key` | ключ для заголовка `X-API-Key` к сервису (`s_media_service`) |
 | `can_add` | разрешена ли загрузка файлов через `/upload` |
 | `user` | владелец узла |
 
@@ -41,7 +42,8 @@
 Механизм — `ProxyViewMixin._proxy_request` (`s_media_proxy/proxy_view_mixin.py`).
 
 - URL: `{server.url}/<путь>` (без глобального префикса `/api/v1`).
-- Заголовки: `X-USER-ID` = `request.user.public_id`, `X-REQUEST-ID` = UUID.
+- Заголовки: `X-USER-ID` = `request.user.public_id`, `X-REQUEST-ID` = UUID,
+  `X-API-Key` = `server.service_api_key` (если задан).
 - Ответ возвращается как есть (`HttpResponse` с телом/статусом/`Content-Type`).
 
 Пример: `GET /catalog/tags/<server_id>/` → `GET {server.url}/catalog/tags`.
@@ -75,41 +77,51 @@
 
 ---
 
-## 5. Оркестрация продвижения файла в каталог (STATUS: TODO)
+## 5. Оркестрация продвижения файла в каталог (реализовано)
 
-По ТЗ v2 «продвижение» выполняет `s_media_api`, а не анализатор. Сейчас
-`AnalyzerProxyView` просто проксирует `assign`/`PATCH /faces`, т.е. цепочка
-продвижения **ещё не реализована**.
+Продвижение выполняет `s_media_api`, а не анализатор. Специальные вьюхи —
+`s_media_proxy/views/membership_views.py`.
 
-Целевой поток (см. `s_media_analyzer/docs/PROJECT.md`, раздел 11):
+Поток `promote` (кластер/лицо):
 
-1. API вызывает `POST {analyzer_url}/clusters/{id}/assign` с `promote=true`
-   (или `PATCH {analyzer_url}/faces/{id}` с `promote`).
-2. Получает `files_to_promote` (`PromoteItem`: `scanned_file_id`, `storage_id`,
-   `folder_path`, `filename`).
-3. Для каждого файла вызывает `POST {server.url}/storage/fileinfo` в
-   `s_media_service` (создаёт запись в каталоге, возвращает `id` файла).
-4. Записывает связь обратно: `PUT {analyzer_url}/scanned-files/catalog-links`
-   (`links: [{scanned_file_id, catalog_file_id}]`).
+1. `GET {analyzer_url}/clusters/{id}/promotable-files` (или `GET /faces/{id}`);
+2. для каждого файла `POST {server.url}/storage/fileinfo` с телом
+   `{ip, storage_id, folder_path, filename, add_tags: [name], status: 'active'}`
+   (`add_tags` не стирает существующие теги; пустое имя — `add_tags` не шлётся;
+   `status='active'` возвращает ранее убранный файл);
+3. `PUT {analyzer_url}/scanned-files/catalog-links` со связями
+   (`scanned_file_id`, `catalog_file_id`).
 
-Потребуется: маппинг `storage_id → Server` (по `storages` сервиса) и
-специальные вьюхи вместо generic-прокси для `assign`/`PATCH /faces`.
+Поток `unpromote`: для каждого `catalog_file_id` — `POST {server.url}/storage/fileinfo`
+с `status='inactive'`, затем очистка связи `catalog_file_id=null`.
+
+Удаление файла из каталога (`POST /storage/fileinfo/...` с `status='inactive'`)
+дополнительно чистит связь в анализаторе: `DELETE {analyzer_url}/catalog-files/{id}/link`.
+Если анализатор недоступен или вернул ошибку — в лог пишется warning, а клиент
+получает успешный ответ сервиса (файл уже скрыт, связь исправит сверка).
 
 ---
 
-## 6. Права (STATUS: TODO)
+## 6. Права (реализовано)
 
-По ТЗ v2 права проверяет `s_media_api`, анализатор доверяет API и не дублирует
-проверки:
+По умолчанию всё закрыто: `REST_FRAMEWORK['DEFAULT_PERMISSION_CLASSES']` =
+`IsAuthenticated`. Явно открыты (`AllowAny`) только:
 
-- данные **нескатализированных** файлов и действия `assign`/`promote` — только
-  владелец хранилища;
-- для файлов **в каталоге** видимость лиц/геометок совпадает с видимостью
-  самого файла (`is_public`).
+- `/api/token/`, `/api/token/refresh/`, `/api/token/verify/`;
+- `/main/`, `/preview/…`, `/file/…`, `/folders_image` — фронт грузит их через
+  `<img>`/`<video>` без JWT.
 
-Сейчас на уровне API проверяется только «сервер принадлежит текущему
-пользователю». Тонкая проверка по владельцу хранилища и `is_public` — следующий
-этап.
+`/users/` и `/groups/` доступны только администраторам (`IsAdminUser`).
+
+Владелец узла проверяется единой функцией `get_owned_server(request, server_id)`
+(`s_media_proxy/repository.py`): сервера нет или он чужой → 404. Она применяется
+ко всем маршрутам, где `server_id` участвует в адресе или теле запроса. Для
+`/preview` и `/file` владелец не проверяется (только существование сервера → 404),
+так как доступ без JWT остаётся осознанно (подписанные ссылки — отдельный контракт).
+
+Поля сервера (`user_id`, `created_by`, `storage_id`, `ip`, ключи) не могут быть
+перезаписаны телом клиента: `_proxy_request` кладёт тело клиента первым, поверх —
+поля сервера.
 
 ---
 
@@ -117,8 +129,9 @@
 
 - **Разные порты**: `url` (service, 8081) и `analyzer_url` (analyzer, 8000) —
   раздельные поля `Server`, а не один URL.
-- **`X-API-Key`** есть только у анализатора; `s_media_service` использует
-  `X-USER-ID` (UUID из `public_id`).
+- **`X-API-Key`** есть и у сервиса (`Server.service_api_key`), и у анализатора
+  (`Server.analyzer_api_key`); ключи не путать и не логировать. `X-USER-ID` —
+  UUID из `public_id`.
 - **Формат ошибок узлов** — `{"error": {"error_code", "error_message"}}`
   (service и analyzer); API отдаёт тело ответа узла как есть.
 - **`verify=True`** в прокси — self-signed сертификаты узлов потребуют решения

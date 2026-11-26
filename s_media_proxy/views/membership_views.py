@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from s_media_proxy.proxy_view_mixin import ProxyViewMixin
-from s_media_proxy.repository import get_server_by_id
+from s_media_proxy.repository import get_owned_server
 
 
 class CatalogMembershipBaseView(APIView, ProxyViewMixin):
@@ -25,9 +25,7 @@ class CatalogMembershipBaseView(APIView, ProxyViewMixin):
     timeout_proxy_request = 60
 
     def _resolve_server(self, server_id: int):
-        server = get_server_by_id(server_id)
-        if server is None or server.user_id != self.request.user.id:
-            raise NotFound(detail='Server not found')
+        server = get_owned_server(self.request, server_id)
         if not server.analyzer_url:
             raise NotFound(detail='Analyzer not configured for this server')
         return server
@@ -38,7 +36,9 @@ class CatalogMembershipBaseView(APIView, ProxyViewMixin):
             return x_forwarded_for.split(',')[0].strip()
         return self.request.META.get('REMOTE_ADDR', '')
 
-    def _proxy_json(self, server, method: str, path: str, body=None, use_api_key: bool = False):
+    def _proxy_json(
+        self, server, method: str, path: str, body=None, use_api_key: bool = False
+    ):
         """Проксирует запрос к узлу и возвращает (parsed_json, error_response).
 
         При статусе >=400 возвращает (None, HttpResponse) — для проброса ошибки
@@ -51,7 +51,11 @@ class CatalogMembershipBaseView(APIView, ProxyViewMixin):
             request=self.request,
             method=method,
             json_data=body,
-            api_key=(server.analyzer_api_key or None) if use_api_key else None,
+            api_key=(
+                (server.analyzer_api_key or None)
+                if use_api_key
+                else (server.service_api_key or None)
+            ),
             forward_request_body=False,
         )
         if response.status_code >= 400:
@@ -70,9 +74,15 @@ class CatalogMembershipBaseView(APIView, ProxyViewMixin):
                 'storage_id': item['storage_id'],
                 'folder_path': item['folder_path'],
                 'filename': item['filename'],
-                'tags': [name] if name else [],
+                'status': 'active',
             }
-            result, error = self._proxy_json(server, 'POST', 'storage/fileinfo', body=body)
+            if name:
+                # add_tags добавляет тег, не стирая существующие; status='active'
+                # возвращает ранее убранный из каталога файл.
+                body['add_tags'] = [name]
+            result, error = self._proxy_json(
+                server, 'POST', 'storage/fileinfo', body=body
+            )
             if error:
                 return None, error
             links.append(
@@ -184,7 +194,9 @@ class FacePromoteView(CatalogMembershipBaseView):
         server = self._resolve_server(server_id)
         name = (request.data or {}).get('name') or ''
 
-        face, error = self._proxy_json(server, 'GET', f'faces/{face_id}', use_api_key=True)
+        face, error = self._proxy_json(
+            server, 'GET', f'faces/{face_id}', use_api_key=True
+        )
         if error:
             return error
 
@@ -203,7 +215,9 @@ class FaceUnpromoteView(CatalogMembershipBaseView):
     def post(self, request: Request, server_id: int, face_id: int):
         server = self._resolve_server(server_id)
 
-        face, error = self._proxy_json(server, 'GET', f'faces/{face_id}', use_api_key=True)
+        face, error = self._proxy_json(
+            server, 'GET', f'faces/{face_id}', use_api_key=True
+        )
         if error:
             return error
 
@@ -225,7 +239,8 @@ class FaceUnpromoteView(CatalogMembershipBaseView):
             return error
 
         _, error = self._write_catalog_links(
-            server, [{'scanned_file_id': face['scanned_file_id'], 'catalog_file_id': None}]
+            server,
+            [{'scanned_file_id': face['scanned_file_id'], 'catalog_file_id': None}],
         )
         if error:
             return error

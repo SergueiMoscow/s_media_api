@@ -35,13 +35,13 @@ s_media_proxy/         # models.py, serializers.py, repository.py, services.py,
                        # proxy_view_mixin.py, servers_views.py, image_generator.py
 s_media_proxy/views/   # вьюхи-прокси по доменам
   catalog_views.py     # содержимое каталога
-  file_views.py        # BaseAPIView, CatalogFileViewSet, MainPageViewSet
-  profile_view.py      # профиль пользователя
-  storage_views.py     # storages, содержимое, preview/file/collage
+  file_views.py        # BaseAPIView, CatalogFileViewSet, MainPageViewSet, preview/file
+  storage_views.py     # storages, содержимое, collage
   tag_views.py         # теги сервера
-  upload_view.py       # загрузка файла на узел
+  upload_view.py       # загрузка файла на узел (APIView, JWT, поток)
   analyzer_views.py    # универсальный прокси в s_media_analyzer
   views.py             # users/groups (стандартные DRF-вьюсеты)
+  membership_views.py  # оркестрация promote/unpromote (переключатель «в каталоге»)
 s_media_proxy/migrations/
 tests/                 # pytest-тесты
 deploy/                # nginx.conf, gen_certificates.sh (self-signed SSL)
@@ -73,6 +73,7 @@ docs/                  # PROJECT.md, INTEGRATION.md
 | `can_add` | разрешена ли загрузка файлов через `/upload` |
 | `analyzer_url` | базовый URL **s_media_analyzer** (например `http://192.168.1.10:8000`); пусто — анализатор не настроен |
 | `analyzer_api_key` | ключ для заголовка `X-API-Key` при обращении к анализатору |
+| `service_api_key` | ключ для заголовка `X-API-Key` при обращении к сервису (`s_media_service`) |
 | `created_at` | дата создания |
 
 ---
@@ -89,12 +90,16 @@ docs/                  # PROJECT.md, INTEGRATION.md
 - `X-USER-ID` — `request.user.public_id` (пустая строка для анонима).
 - `X-REQUEST-ID` — случайный UUID на каждый прокси-запрос.
 - `X-API-Key` — добавляется, если в `_proxy_request` передан `api_key`
-  (используется только для `s_media_analyzer`).
+  (для сервиса — `Server.service_api_key`, для анализатора —
+  `Server.analyzer_api_key`).
 
 Особенности `_proxy_request`:
 
-- `data`/`json_data` — JSON-тело пробрасывается через
-  `json_data.update(request.data)`; multipart — через `data` (без файлов).
+- `data`/`json_data` — JSON-тело и поля формы пробрасываются с приоритетом
+  серверных полей: тело клиента кладётся первым, поверх него — поля сервера
+  (`user_id`, `created_by`, `storage_id`, `ip`), так что подделать их из тела
+  нельзя. Переданный словарь не мутируется. Если тело не словарь, а вид ждёт
+  словарь с серверными полями — 400.
 - `files=request.FILES` — проброс файлов.
 - `timeout` — берётся из атрибута вьюхи `timeout_proxy_request` (по умолчанию 60).
 - `verify` — по умолчанию `True` (self-signed сертификаты узлов — см.
@@ -103,6 +108,7 @@ docs/                  # PROJECT.md, INTEGRATION.md
   к БД, чтобы не удерживать его на время прокси-вызова (защита от исчерпания
   `max_connections` при множестве параллельных запросов, например миниатюр
   анализатора). Соединение переоткрывается лениво при следующем обращении к ORM.
+- Секретные поля (`key`, `api_key`, `password`, …) маскируются в debug-логах.
 
 Универсальный прокси в анализатор — `AnalyzerProxyView`
 (`s_media_proxy/views/analyzer_views.py`): поддерживает GET/POST/PUT/PATCH/DELETE
@@ -113,29 +119,30 @@ docs/                  # PROJECT.md, INTEGRATION.md
 ## 5. API-эндпоинты
 
 Аутентификация большинства эндпоинтов — JWT (заголовок `Authorization: Bearer ...`).
+По умолчанию всё закрыто (`IsAuthenticated`); открыты (`AllowAny`) только
+`/api/token/*`, `/main/`, `/preview/…`, `/file/…`, `/folders_image`.
 
 | Метод и путь | Назначение |
 | --- | --- |
 | `POST /api/token/` | получить пару токенов (username/password) |
 | `POST /api/token/refresh/` | обновить access-токен |
 | `POST /api/token/verify/` | проверить токен |
-| `/users/`, `/groups/` | стандартные DRF-вьюсеты (users/groups) |
+| `/users/`, `/groups/` | стандартные DRF-вьюсеты (users/groups), только `IsAdminUser` |
 | `/servers/` | CRUD узлов (`ServerViewSet`) |
-| `/profile/` | профиль пользователя (`UserProfileViewSet`) |
 | `GET/POST /storages/` | список/создание хранилищ (проксирует на все сервисы или на один по `server_id`) |
 | `PATCH /storages/<storage_id>/` | обновление хранилища (`StorageDetailViewSet`) |
 | `PATCH/DELETE /storages/<server_id>/<storage_id>/` | правка/удаление хранилища (`StorageViewSet`) |
 | `GET /servers_content/` | сводка содержимого по всем серверам |
 | `GET /storage/<server_id>/<storage_id>/` | содержимое хранилища |
-| `GET /folders_image?folders=N` | генерация PNG-коллажа папок (локальная генерация) |
+| `GET /folders_image?folders=N` | генерация PNG-коллажа папок (локальная генерация, без JWT) |
 | `GET /folder_collage/<server_id>/<storage_id>/` | коллаж папки |
-| `GET /preview/<server_id>/<storage_id>/` | превью файла |
-| `GET /file/<server_id>/<storage_id>/` | файл |
+| `GET /preview/<server_id>/<storage_id>/` | превью файла (без JWT) |
+| `GET /file/<server_id>/<storage_id>/` | файл (без JWT) |
 | `POST /storage/fileinfo/<server_id>/<storage_id>/` | добавить/изменить данные файла в каталоге |
 | `GET /catalog/tags/<server_id>/` | теги сервера |
-| `GET /main/` | главная страница (последние файлы по всем серверам) |
+| `GET /main/` | главная страница (последние файлы по всем серверам, без JWT) |
 | `GET /catalog_content/<server_id>/<storage_id>/` | содержимое каталога |
-| `POST /upload?server_id=...` | загрузка файла (требует `can_add` у узла) |
+| `POST /upload?server_id=...` | загрузка файла (JWT, требует `can_add` у узла) |
 | `/analyzer/<server_id>/` и `/analyzer/<server_id>/<path:analyzer_path>` | универсальный прокси в `s_media_analyzer` |
 | `GET /analyzer/<server_id>/stats` | статус воркера анализатора (сводка) |
 | `GET /analyzer/<server_id>/queue` | детальная очередь обработки анализатора |
@@ -210,9 +217,12 @@ python manage.py makemigrations --settings django_app.settings_tests --check --d
 - **Один узел = одна запись `Server`**, поля `url` (сервис) и `analyzer_url`
   (анализатор) — раздельные, т.к. сервисы слушают разные порты.
 - **`X-USER-ID`** — сквозной идентификатор пользователя от API к узлам.
-- **`X-API-Key`** — добавляется только для анализатора (ключ хранится на узле,
-  в `Server.analyzer_api_key`); не возвращается наружу (`write_only` в
-  сериализаторе).
+- **`X-API-Key`** — ключ узла: для сервиса — `Server.service_api_key`, для
+  анализатора — `Server.analyzer_api_key`; оба `write_only` в сериализаторе и не
+  возвращаются наружу.
+- **Проверка владельца** — единая функция `get_owned_server(request, server_id)`
+  (`s_media_proxy/repository.py`): сервера нет или он чужой → 404. Используется
+  во всех вьюхах, где `server_id` приходит из адреса/тела.
 - **Прокси-вьюхи** — тонкие: решают узел по `server_id`, строят URL, вызывают
   `_proxy_request`, при необходимости обогащают ответ (`server_id`,
   `server_name`, `server_url`).
@@ -227,12 +237,10 @@ python manage.py makemigrations --settings django_app.settings_tests --check --d
 - **`verify=True`** в прокси: если узлы за self-signed сертификатами, прокси
   будет падать на проверке TLS. Для прод-узлов лучше использовать доверенные
   сертификаты либо продумать проброс `verify`.
-- **`Server.can_add`** появился позже остальных полей — убедиться, что миграция
-  `0003_*` накатана в проде (в прошлом коммите миграции на `can_add` не было).
+- **`Server.can_add`** и **`Server.service_api_key`** появились позже остальных
+  полей — убедиться, что миграции `0003_*` и `0004_*` накатаны в проде.
 - **`static/` и `staticfiles/`** — `staticfiles/` это `STATIC_ROOT`
   (результат `collectstatic`), в git не коммитится.
-- Некоторые вьюхи намеренно не ставят `permission_classes` — используется
-  глобальная JWT-аутентификация; проверяй доступность каждой вьюхи отдельно.
-- Полный прогон тестов может показывать предсуществующее падение
-  `tests/test_tags.py::test_user_tags` (ожидание `json={}` против фактического
-  `json=None` для GET в `_proxy_request`) — не связано с последними правками.
+- По умолчанию всё закрыто (`IsAuthenticated`); открыты только `/api/token/*`,
+  `/main/`, `/preview/…`, `/file/…`, `/folders_image` — проверяй `permission_classes`
+  каждой вьюхи отдельно.

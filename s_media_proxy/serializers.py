@@ -25,7 +25,16 @@ class GroupSerializer(serializers.HyperlinkedModelSerializer):
 class ServerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Server
-        fields = ('id', 'name', 'url', 'can_add', 'analyzer_url', 'analyzer_api_key')
+        fields = (
+            'id',
+            'name',
+            'url',
+            'can_add',
+            'analyzer_url',
+            'analyzer_api_key',
+            'service_api_key',
+        )
         extra_kwargs = {
             'analyzer_api_key': {'write_only': True},
+            'service_api_key': {'write_only': True},
         }

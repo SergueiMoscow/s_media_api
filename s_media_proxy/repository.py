@@ -1,5 +1,7 @@
 from typing import List
 
+from rest_framework.exceptions import NotFound
+
 from s_media_proxy.models import Server, User
 
 
@@ -10,6 +12,19 @@ def get_servers_by_user(user: User) -> list[Server]:
 
 def get_server_by_id(server_id: int) -> Server:
     server = Server.objects.filter(id=server_id).first()
+    return server
+
+
+def get_owned_server(request, server_id: int) -> Server:
+    """Сервер текущего пользователя, иначе 404.
+
+    Единая точка проверки владельца узла: если сервера нет или он принадлежит
+    другому пользователю, поднимается NotFound (404) — так клиент не может
+    отличить «нет такого сервера» от «сервер чужой».
+    """
+    server = Server.objects.filter(id=server_id, user_id=request.user.id).first()
+    if server is None:
+        raise NotFound(detail='Server not found')
     return server
 
 

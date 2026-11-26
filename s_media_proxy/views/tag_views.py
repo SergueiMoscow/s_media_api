@@ -12,5 +12,6 @@ class ServerTags(BaseAPIView, ProxyViewMixin):
             method='GET',
             request_url=url,
             request=request,
+            api_key=self.server.service_api_key or None,
         )
         return result

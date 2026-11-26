@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import ANY, patch, MagicMock
+from unittest.mock import ANY, patch
 
 import pytest
 from django.urls import reverse
@@ -10,22 +10,24 @@ from s_media_proxy.models import Server, User
 
 
 @pytest.mark.django_db
-def test_patch_storage_ok(authorized_client, mock_created_server, mock_request):
+def test_patch_storage_ok(
+    authorized_client, auth_user, mock_created_server, mock_request
+):
     server_id = mock_created_server.return_value.id
     data = {
         "server_id": str(server_id),
         "key": "secret_key_test",
         "name": "test 1",
-        "path": "/tmp"
+        "path": "/tmp",
     }
     storage_id = str(uuid.uuid4())
     authorized_client.patch(f'/storages/{storage_id}/', data)
     mock_request.assert_called_once_with(
         'PATCH',
         f'{mock_created_server.return_value.url}/storages/{storage_id}',
-        data=data,
+        data={**data, 'user_id': str(auth_user.public_id)},
         files=ANY,
-        json=ANY,
+        json=None,
         headers=ANY,
         timeout=ANY,
         verify=True,
@@ -33,24 +35,17 @@ def test_patch_storage_ok(authorized_client, mock_created_server, mock_request):
 
 
 @pytest.mark.django_db
-def test_delete_storage_ok(authorized_client, mock_request, faker, mock_created_server):
+def test_delete_storage_ok(authorized_client, mock_request, created_user_and_server):
     storage_id = str(uuid.uuid4())
-    server = Server(
-        id=faker.random_int(),
-        name='test server',
-        url='http://test',
-    )
-    mock_created_server.return_value = server
-    server_id = mock_created_server.return_value.id
-
-    result = authorized_client.delete(f'/storages/{server_id}/{storage_id}/')
+    server = created_user_and_server
+    result = authorized_client.delete(f'/storages/{server.id}/{storage_id}/')
     assert result.status_code == HTTP_200_OK
     mock_request.assert_called_once_with(
         'DELETE',
-        f'{mock_created_server.return_value.url}/storages/{storage_id}',
-        data=ANY,
+        f'{server.url}/storages/{storage_id}',
+        data={},
         files=ANY,
-        json=ANY,
+        json=None,
         headers=ANY,
         timeout=ANY,
         verify=True,
@@ -65,7 +60,7 @@ def test_create_storage(auth_user, get_fake_response, mock_created_server):
         "server_id": '1',
         "key": "secret_key_test",
         "name": "test 1",
-        "path": "/tmp"
+        "path": "/tmp",
     }
 
     with patch('requests.request') as mock_requests_request:
@@ -83,9 +78,13 @@ def test_create_storage(auth_user, get_fake_response, mock_created_server):
         mock_requests_request.assert_called_once_with(
             'POST',
             f'{server.url}/storages/',
-            data=data,
+            data={
+                **data,
+                'user_id': str(auth_user.public_id),
+                'created_by': str(auth_user.public_id),
+            },
             files=ANY,
-            json=ANY,
+            json=None,
             headers=ANY,
             timeout=ANY,
             verify=True,
@@ -120,7 +119,9 @@ def test_get_storage_content_ok(authorized_client, mock_created_server, mock_req
     url = f'/storage/{server_id}/{storage_id}/'
 
     # Создаем пример ответа, который будет возвращать наш объект ответа
-    mock_request.return_value.content = '{"results":{"folders": [], "files":{}}, "pagination":{}}'
+    mock_request.return_value.content = (
+        '{"results":{"folders": [], "files":{}}, "pagination":{}}'
+    )
 
     response = authorized_client.get(url, format='json')
 
@@ -141,7 +142,9 @@ def test_get_storage_content_ok(authorized_client, mock_created_server, mock_req
 
 
 @pytest.mark.django_db
-def test_get_servers_content_ok(authorized_client, created_user_and_server, mock_request):
+def test_get_servers_content_ok(
+    authorized_client, created_user_and_server, mock_request
+):
     url = f'/servers_content/'
     mock_request.return_value.content = '{"results":[{}]}'
     response = authorized_client.get(url, format='json')
@@ -175,7 +178,7 @@ def test_get_folder_collage_ok(authorized_client, mock_created_server, mock_requ
         f'{mock_created_server.return_value.url}/storage/collage/{storage_id}?folder={folder}',
         data={},
         files=ANY,
-        json={},
+        json=None,
         headers=ANY,
         timeout=ANY,
         verify=True,
@@ -183,7 +186,9 @@ def test_get_folder_collage_ok(authorized_client, mock_created_server, mock_requ
 
 
 @pytest.mark.django_db
-def test_get_file_preview_by_storage_folder_and_filename_ok(authorized_client, mock_created_server, mock_request):
+def test_get_file_preview_by_storage_folder_and_filename_ok(
+    authorized_client, mock_created_server, mock_request
+):
     server_id = mock_created_server.return_value.id
     storage_id = uuid.uuid4()
     folder = 'test_folder'
@@ -199,7 +204,7 @@ def test_get_file_preview_by_storage_folder_and_filename_ok(authorized_client, m
         f'{mock_created_server.return_value.url}/storage/preview/{storage_id}?folder={folder}&filename={filename}',
         data={},
         files=ANY,
-        json={},
+        json=None,
         headers=ANY,
         timeout=ANY,
         verify=True,
@@ -207,7 +212,9 @@ def test_get_file_preview_by_storage_folder_and_filename_ok(authorized_client, m
 
 
 @pytest.mark.django_db
-def test_get_file_preview_by_file_id_ok(authorized_client, mock_created_server, mock_request):
+def test_get_file_preview_by_file_id_ok(
+    authorized_client, mock_created_server, mock_request
+):
     server_id = mock_created_server.return_value.id
     file_id = uuid.uuid4()
     url = f'/preview/{server_id}/{file_id}/'
@@ -221,7 +228,7 @@ def test_get_file_preview_by_file_id_ok(authorized_client, mock_created_server, 
         f'{mock_created_server.return_value.url}/catalog/preview/{file_id}',
         data={},
         files=ANY,
-        json={},
+        json=None,
         headers=ANY,
         timeout=ANY,
         verify=True,

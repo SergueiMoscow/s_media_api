@@ -12,7 +12,7 @@ class UserViewSet(viewsets.ModelViewSet):  # pylint: disable=too-few-public-meth
 
     queryset = User.objects.all().order_by('-date_joined')
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
 
 class GroupViewSet(viewsets.ModelViewSet):  # pylint: disable=too-few-public-methods
@@ -22,4 +22,4 @@ class GroupViewSet(viewsets.ModelViewSet):  # pylint: disable=too-few-public-met
 
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]

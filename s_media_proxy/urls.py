@@ -10,29 +10,31 @@ from s_media_proxy.image_generator import generate_folders_image
 from s_media_proxy.servers_views import ServerViewSet
 from s_media_proxy.views.analyzer_views import AnalyzerProxyView
 from s_media_proxy.views.catalog_views import CatalogContentViewSet
-from s_media_proxy.views.file_views import CatalogFileViewSet, MainPageViewSet
+from s_media_proxy.views.file_views import (
+    CatalogFileViewSet,
+    FilePreviewViewSet,
+    FileViewSet,
+    MainPageViewSet,
+)
 from s_media_proxy.views.membership_views import (
     ClusterPromoteView,
     ClusterUnpromoteView,
     FacePromoteView,
     FaceUnpromoteView,
 )
-from s_media_proxy.views.profile_view import UserProfileViewSet
 from s_media_proxy.views.storage_views import (
     CollageViewSet,
-    FilePreviewViewSet,
     ServersContentViewSet,
     StorageContentViewSet,
     StorageDetailViewSet,
     StorageListViewSet,
-    StorageViewSet, FileViewSet,
+    StorageViewSet,
 )
 from s_media_proxy.views.tag_views import ServerTags
 from s_media_proxy.views.upload_view import upload_file
 
 router = routers.DefaultRouter()
 router.register(r'servers', ServerViewSet, basename='server')
-router.register(r'profile', UserProfileViewSet, basename='profile')
 
 # Wire up our API using automatic URL routing.
 # Additionally, we include login URLs for the browsable API.

@@ -1,112 +1,125 @@
 import logging
-from typing import Optional
 
 import requests
-from django.http import JsonResponse, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
+from django.http import HttpResponse, JsonResponse
+from rest_framework import permissions
+from rest_framework.views import APIView
 
-from s_media_proxy.models import Server
+from s_media_proxy.repository import get_owned_server
 
 logger = logging.getLogger(__name__)
 
+CHUNK_SIZE = 64 * 1024
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def upload_file(request):
-    """
-    Проксирует запрос на загрузку файла на соответствующий сервис.
+
+class UploadFileView(APIView):
+    """Проксирует загрузку файла на соответствующий сервис.
 
     Query параметры:
     - server_id: ID сервера для загрузки (обязательный)
-    - original_filename: оригинальное имя файла
+    - original_filename: оригинальное имя файла (обязательный для сервиса)
     - note: заметка к файлу
     - tags: теги через запятую
     - is_public: публичный ли файл
     """
-    user_id = request.headers.get('X-User-ID')
-    if not user_id:
-        return JsonResponse(
-            {'error': 'Missing X-User-ID header'},
-            status=400
-        )
 
-    server_id = request.GET.get('server_id')
-    if not server_id:
-        return JsonResponse(
-            {'error': 'Missing server_id parameter'},
-            status=400
-        )
+    permission_classes = [permissions.IsAuthenticated]
+    timeout = 300  # 5 минут для больших файлов
 
-    # Получаем сервер
-    try:
-        server = Server.objects.get(id=server_id, user_id=user_id)
-    except Server.DoesNotExist:
-        return JsonResponse(
-            {'error': f'Server with id={server_id} not found or access denied'},
-            status=404
-        )
+    def post(self, request):
+        server_id = request.GET.get('server_id')
+        if not server_id:
+            return JsonResponse({'error': 'Missing server_id parameter'}, status=400)
 
-    # Проверяем, можно ли добавлять на этот сервер
-    if not server.can_add:
-        return JsonResponse(
-            {'error': f'Server "{server.name}" does not allow file uploads'},
-            status=403
-        )
+        original_filename = request.GET.get('original_filename')
+        if not original_filename:
+            return JsonResponse(
+                {'error': 'Missing original_filename parameter'}, status=400
+            )
 
-    # Формируем URL для проксирования
-    service_url = server.url.rstrip('/') + '/upload'
+        # Входящий X-User-ID игнорируем: сервер ищется по server_id и текущему
+        # пользователю (JWT), в сервис уходит request.user.public_id (UUID).
+        try:
+            server_id_int = int(server_id)
+        except (TypeError, ValueError):
+            return JsonResponse(
+                {'error': f'Server with id={server_id} not found or access denied'},
+                status=404,
+            )
 
-    # Передаем query параметры (кроме server_id)
-    params = {}
-    for key in ['original_filename', 'note', 'tags', 'is_public']:
-        value = request.GET.get(key)
-        if value is not None:
-            params[key] = value
+        try:
+            server = get_owned_server(request, server_id_int)
+        except Exception:
+            return JsonResponse(
+                {'error': f'Server with id={server_id} not found or access denied'},
+                status=404,
+            )
 
-    # Подготавливаем заголовки
-    headers = {
-        'X-User-ID': user_id,
-        'Content-Type': request.headers.get('Content-Type', 'application/octet-stream'),
-    }
+        # Проверяем, можно ли добавлять на этот сервер
+        if not server.can_add:
+            return JsonResponse(
+                {'error': f'Server "{server.name}" does not allow file uploads'},
+                status=403,
+            )
 
-    # Проксируем запрос
-    try:
-        logger.info(
-            f"Proxying upload to {service_url} for user {user_id}, "
-            f"server {server.name} (id={server_id})"
-        )
+        service_url = server.url.rstrip('/') + '/upload'
 
-        response = requests.post(
-            service_url,
-            params=params,
-            headers=headers,
-            data=request.body,
-            timeout=300,  # 5 минут для больших файлов
-        )
+        params = {}
+        for key in ['original_filename', 'note', 'tags', 'is_public']:
+            value = request.GET.get(key)
+            if value is not None:
+                params[key] = value
 
-        # Возвращаем ответ от сервиса
-        return HttpResponse(
-            response.content,
-            status=response.status_code,
-            content_type=response.headers.get('Content-Type', 'application/json')
-        )
+        headers = {
+            'X-USER-ID': str(request.user.public_id),
+            'Content-Type': request.headers.get(
+                'Content-Type', 'application/octet-stream'
+            ),
+        }
+        if server.service_api_key:
+            headers['X-API-Key'] = server.service_api_key
 
-    except requests.exceptions.Timeout:
-        logger.error(f"Timeout while uploading to {service_url}")
-        return JsonResponse(
-            {'error': 'Upload timeout'},
-            status=504
-        )
-    except requests.exceptions.ConnectionError as e:
-        logger.error(f"Connection error while uploading to {service_url}: {e}")
-        return JsonResponse(
-            {'error': f'Cannot connect to service at {server.url}'},
-            status=502
-        )
-    except Exception as e:
-        logger.error(f"Unexpected error while uploading to {service_url}: {e}")
-        return JsonResponse(
-            {'error': 'Internal server error'},
-            status=500
-        )
+        # Тело файла передаём потоком, не читая в память (request.body ограничен
+        # DATA_UPLOAD_MAX_MEMORY_SIZE и не подходит для больших файлов).
+        raw_request = request._request
+
+        def body_stream():
+            while True:
+                chunk = raw_request.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                yield chunk
+
+        try:
+            logger.info(
+                f'Proxying upload to {service_url} for server {server.name} (id={server_id})'
+            )
+            response = requests.post(
+                service_url,
+                params=params,
+                headers=headers,
+                data=body_stream(),
+                timeout=self.timeout,
+            )
+
+            return HttpResponse(
+                response.content,
+                status=response.status_code,
+                content_type=response.headers.get('Content-Type', 'application/json'),
+            )
+
+        except requests.exceptions.Timeout:
+            logger.error(f'Timeout while uploading to {service_url}')
+            return JsonResponse({'error': 'Upload timeout'}, status=504)
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f'Connection error while uploading to {service_url}: {e}')
+            return JsonResponse(
+                {'error': f'Cannot connect to service at {server.url}'},
+                status=502,
+            )
+        except Exception as e:
+            logger.error(f'Unexpected error while uploading to {service_url}: {e}')
+            return JsonResponse({'error': 'Internal server error'}, status=500)
+
+
+upload_file = UploadFileView.as_view()

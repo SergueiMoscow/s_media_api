@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from abc import ABC
@@ -10,15 +11,36 @@ from django.http import HttpResponse
 from rest_framework.request import Request
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG) # INFO, WARNING, ERROR или DEBUG
+logger.setLevel(logging.DEBUG)  # INFO, WARNING, ERROR или DEBUG
 
 # Создаем обработчик логирования, который будет выводить сообщения в stderr
 handler = logging.StreamHandler()
-handler.setLevel(logging.DEBUG) # INFO, WARNING, ERROR или DEBUG
+handler.setLevel(logging.DEBUG)  # INFO, WARNING, ERROR или DEBUG
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
+
+_SENSITIVE_FIELDS = (
+    'key',
+    'api_key',
+    'analyzer_api_key',
+    'service_api_key',
+    'password',
+    'secret',
+)
+
+
+def _mask_data(value):
+    """Копия структуры с замаскированными секретными полями (для логов)."""
+    if isinstance(value, dict):
+        return {
+            key: '***' if key in _SENSITIVE_FIELDS else _mask_data(val)
+            for key, val in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_mask_data(item) for item in value]
+    return value
 
 
 class ProxyViewMixin(ABC):
@@ -36,9 +58,8 @@ class ProxyViewMixin(ABC):
         api_key: str = None,
         forward_request_body: bool = True,
     ):
-        # request_url = request.get_full_path()
-        if data is None:
-            data = {}
+        method_upper = method.upper()
+
         if isinstance(request.user, AnonymousUser):
             user_id = ''
         else:
@@ -49,33 +70,58 @@ class ProxyViewMixin(ABC):
         }
         if api_key:
             request_header['X-API-Key'] = api_key
+
         if data is None:
             data = {}
-        if json_data is None or method.lower() in ('GET', 'DELETE'):
-            json_data = None
+
+        # Поля сервера (`json_data`) не должны перезаписываться телом клиента.
+        server_fields = json_data if isinstance(json_data, dict) else None
+
+        out_data = dict(data)
+        out_json = None
+        is_get_or_delete = method_upper in ('GET', 'DELETE')
 
         if forward_request_body:
-            if 'multipart/form-data' in request.content_type:
-                for key, value in request.data.items():
-                    if isinstance(value, (InMemoryUploadedFile, TemporaryUploadedFile)):
-                        continue
-                    data[key] = value
+            content_type = request.content_type or ''
+            is_multipart = 'multipart/form-data' in content_type
+            is_json = 'application/json' in content_type
 
-            if (
-                'application/json' in request.content_type
-                and not request.FILES
-                and not method.lower() in ('GET', 'DELETE')
-            ):
-                json_data.update(request.data)
+            if is_multipart:
+                client_fields = {
+                    key: value
+                    for key, value in request.data.items()
+                    if not isinstance(
+                        value, (InMemoryUploadedFile, TemporaryUploadedFile)
+                    )
+                }
+                # Сначала тело клиента, поверх — поля сервера (сервер побеждает).
+                out_data = {**out_data, **client_fields, **(server_fields or {})}
+            elif is_json and not request.FILES and not is_get_or_delete:
+                if not isinstance(request.data, dict):
+                    if server_fields:
+                        # Тело не словарь, а вид ждёт словарь с серверными полями.
+                        return HttpResponse(
+                            json.dumps(
+                                {'detail': 'Request body must be a JSON object'}
+                            ),
+                            status=400,
+                            content_type='application/json',
+                        )
+                    out_json = request.data
+                else:
+                    merged = {**request.data, **(server_fields or {})}
+                    if merged:
+                        out_json = merged
 
-        # Логгируем детали запроса перед его выполнением
-        logger.info(f'Proxy request: {method} {request_url}')
-        # logger.info(f'Proxy request timeout: {self.timeout_proxy_request or timeout}')
-        # logger.info(f'Proxy request verify: {verify}')
-        if data:
-            logger.debug(f'Proxy request data: {data}')
-        if json_data:
-            logger.debug(f'Proxy request json data: {json_data}')
+        if not forward_request_body and server_fields and not is_get_or_delete:
+            out_json = server_fields
+
+        # Логгируем детали запроса перед его выполнением (ключи маскируем).
+        logger.info(f'Proxy request: {method_upper} {request_url}')
+        if out_data:
+            logger.debug(f'Proxy request data: {_mask_data(out_data)}')
+        if out_json:
+            logger.debug(f'Proxy request json data: {_mask_data(out_json)}')
         if request.FILES:
             logger.debug('Proxy request has files')
 
@@ -85,11 +131,11 @@ class ProxyViewMixin(ABC):
         connection.close()
 
         proxy_response = requests.request(
-            method,
+            method_upper,
             request_url,
-            data=data,
+            data=out_data,
             files=request.FILES,
-            json=json_data,
+            json=out_json,
             headers=request_header,
             timeout=self.timeout_proxy_request or timeout,
             verify=verify,

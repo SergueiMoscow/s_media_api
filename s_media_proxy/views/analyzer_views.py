@@ -6,7 +6,7 @@ from rest_framework.request import Request
 from rest_framework.views import APIView
 
 from s_media_proxy.proxy_view_mixin import ProxyViewMixin
-from s_media_proxy.repository import get_server_by_id
+from s_media_proxy.repository import get_owned_server
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,7 @@ class AnalyzerProxyView(APIView, ProxyViewMixin):
     timeout_proxy_request = 60
 
     def _resolve_server(self, server_id: int):
-        server = get_server_by_id(server_id)
-        if server is None or server.user_id != self.request.user.id:
-            raise NotFound(detail='Server not found')
+        server = get_owned_server(self.request, server_id)
         if not server.analyzer_url:
             raise NotFound(detail='Analyzer not configured for this server')
         return server

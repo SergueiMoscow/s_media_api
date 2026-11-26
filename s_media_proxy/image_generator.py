@@ -4,7 +4,8 @@ import random
 
 from django.http import HttpResponse
 from PIL import Image
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 
 from django_app.settings import BASE_DIR
 
@@ -126,6 +127,7 @@ def generate_image(
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def generate_folders_image(request):
     folders = request.GET.get('folders')
     max_images = int(folders)

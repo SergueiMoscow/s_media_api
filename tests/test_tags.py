@@ -15,10 +15,8 @@ def test_user_tags(authorized_client, mock_created_server, mock_request):
         f'{mock_created_server.return_value.url}/catalog/tags',
         data={},
         files=ANY,
-        json={},
+        json=None,
         headers=ANY,
         timeout=ANY,
         verify=True,
     )
-
-

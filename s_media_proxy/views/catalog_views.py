@@ -21,6 +21,7 @@ class CatalogContentViewSet(BaseAPIView, ProxyViewMixin):
             method='GET',
             request_url=url,
             request=request,
+            api_key=self.server.service_api_key or None,
         )
         # Добавить данные о storage и server
         content = json.loads(response.content)
@@ -31,9 +32,9 @@ class CatalogContentViewSet(BaseAPIView, ProxyViewMixin):
 
     def get_url(self):
         url = ''
-        params = {key: value for key, value in self.request.query_params.items() if value}
+        params = {
+            key: value for key, value in self.request.query_params.items() if value
+        }
         if params:
             url += urllib.parse.urlencode(params)
         return url
-
-
