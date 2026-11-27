@@ -16,7 +16,7 @@ services:
     restart: always
 
   api:
-    image: ghcr.io/sergueimoscow/s_media_api:latest
+    image: ghcr.io/sergueimoscow/s_media_api:${IMAGE_TAG:-latest}
     build: .
     container_name: s_media_api
     volumes:
