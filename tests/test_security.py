@@ -56,24 +56,28 @@ def test_anonymous_401_on_closed_routes(client):
 
 @pytest.mark.django_db
 def test_open_routes_accessible_without_auth(
-    client, created_user_and_server, mock_request
+    client, created_user_and_server, mock_request, node_stream_factory
 ):
     server = created_user_and_server
     storage_id = uuid.uuid4()
 
+    node = node_stream_factory(
+        status_code=200, headers={'Content-Type': 'image/jpeg'}, body=b'abc'
+    )
     assert client.get('/main/').status_code == 200
-    assert (
-        client.get(
-            f'/preview/{server.id}/{storage_id}/', {'filename': 'x.jpg'}
-        ).status_code
-        == 200
-    )
-    assert (
-        client.get(
-            f'/file/{server.id}/{storage_id}/', {'filename': 'x.jpg'}
-        ).status_code
-        == 200
-    )
+    with patch('requests.get', return_value=node):
+        assert (
+            client.get(
+                f'/preview/{server.id}/{storage_id}/', {'filename': 'x.jpg'}
+            ).status_code
+            == 200
+        )
+        assert (
+            client.get(
+                f'/file/{server.id}/{storage_id}/', {'filename': 'x.jpg'}
+            ).status_code
+            == 200
+        )
     assert client.get('/folders_image', {'folders': 2}).status_code == 200
 
 

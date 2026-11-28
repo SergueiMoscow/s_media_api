@@ -1,11 +1,13 @@
 import json
 import logging
 import uuid
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin
 
 import requests
-from django.db import transaction
+from django.contrib.auth.models import AnonymousUser
+from django.db import connection, transaction
+from django.http import StreamingHttpResponse
 from rest_framework import permissions
 from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
@@ -131,6 +133,7 @@ class MainPageViewSet(APIView, ProxyViewMixin):
 
     # Главная доступна без JWT (её грузит лендинг).
     permission_classes = [permissions.AllowAny]
+    timeout_proxy_request = 10  # таймаут на узел для главной страницы
 
     @transaction.non_atomic_requests
     def get(self, request: Request):
@@ -139,11 +142,23 @@ class MainPageViewSet(APIView, ProxyViewMixin):
             raise NotFound(detail="No servers found")
 
         files = []
+        errors = 0
         with ThreadPoolExecutor(max_workers=5) as executor:
-            result = executor.map(self.fetch_data, servers)
-        for res in result:
-            files.extend(res)
+            futures = {
+                executor.submit(self.fetch_data, server): server for server in servers
+            }
+            for future in as_completed(futures):
+                server = futures[future]
+                try:
+                    files.extend(future.result())
+                except Exception as e:
+                    errors += 1
+                    logger.warning(f'file_views.py: node {server.url} failed: {e}')
+
         if len(files) == 0:
+            if errors and errors == len(servers):
+                # Все узлы ответили ошибкой — не 404, а 502.
+                return Response({'detail': 'Bad Gateway'}, status=502)
             raise NotFound(detail="No files found")
         # sorted_files = sorted(files, key=itemgetter('created_at'), reverse=True)  # сортировка по created_at
         files.sort(key=lambda file: file['created_at'], reverse=True)
@@ -178,15 +193,14 @@ class MainPageViewSet(APIView, ProxyViewMixin):
             request=self.request,
             api_key=server.service_api_key or None,
         )
+        if response.status_code >= 400:
+            raise RuntimeError(f'node returned HTTP {response.status_code}')
         data = json.loads(response.content)
-        counter = 0
-        for file in data['files']:
+        files = data['files']
+        for file in files:
             file['server_id'] = server.id
-            counter += 1
-            if counter > 10:
-                pass
         logger.info(f'file_views.py: end fetching {server.url}')
-        return data['files']
+        return files
 
 
 class BaseFileViewSet(BaseAPIView, ProxyViewMixin):
@@ -195,6 +209,19 @@ class BaseFileViewSet(BaseAPIView, ProxyViewMixin):
     permission_classes = [permissions.AllowAny]
 
     action_path = ''
+    connect_timeout = 5
+    read_timeout = 60
+    chunk_size = 64 * 1024
+
+    # Заголовки, которые передаём клиенту как есть.
+    passthrough_headers = {
+        'Content-Length',
+        'Content-Range',
+        'Accept-Ranges',
+        'Last-Modified',
+        'ETag',
+        'Cache-Control',
+    }
 
     def get(self, request: Request, server_id: int, storage_id: uuid.UUID):
         if request.GET.get('filename'):
@@ -208,16 +235,54 @@ class BaseFileViewSet(BaseAPIView, ProxyViewMixin):
             file_id = storage_id
             self.get_additional_data(server_id=server_id, check_owner=False)
             url = f'{self.server.url}/catalog/{self.action_path}/{file_id}'
-        additional_data = {}
-        response = self._proxy_request(
-            request_url=url,
-            request=request,
-            method='GET',
-            json_data=additional_data,
-            data=additional_data,
-            api_key=self.server.service_api_key or None,
+        return self._stream_node_file(request, url)
+
+    def _stream_node_file(self, request: Request, url: str):
+        """Проксирует файл потоком, пробрасывая Range/If-Range."""
+        if isinstance(request.user, AnonymousUser):
+            user_id = ''
+        else:
+            user_id = str(request.user.public_id)
+        headers = {
+            'X-USER-ID': user_id,
+            'X-REQUEST-ID': str(uuid.uuid4()),
+        }
+        if self.server.service_api_key:
+            headers['X-API-Key'] = self.server.service_api_key
+        # Пробрасываем Range/If-Range (видео-перемотка).
+        for header in ('Range', 'If-Range'):
+            value = request.META.get(f'HTTP_{header.upper().replace("-", "_")}')
+            if value:
+                headers[header] = value
+
+        connection.close()
+
+        node_response = requests.get(
+            url,
+            headers=headers,
+            stream=True,
+            timeout=(self.connect_timeout, self.read_timeout),
         )
+
+        response = StreamingHttpResponse(
+            self._iter_chunks(node_response),
+            status=node_response.status_code,
+            content_type=node_response.headers.get('Content-Type'),
+        )
+        for name in self.passthrough_headers:
+            value = node_response.headers.get(name)
+            if value is not None:
+                response[name] = value
         return response
+
+    def _iter_chunks(self, node_response):
+        """Потоковая отдача чанков; соединение с узлом закрываем всегда."""
+        try:
+            for chunk in node_response.iter_content(chunk_size=self.chunk_size):
+                if chunk:
+                    yield chunk
+        finally:
+            node_response.close()
 
 
 class FilePreviewViewSet(BaseFileViewSet):

@@ -3,6 +3,7 @@ import logging
 import requests
 from django.http import HttpResponse, JsonResponse
 from rest_framework import permissions
+from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 
 from s_media_proxy.repository import get_owned_server
@@ -40,16 +41,8 @@ class UploadFileView(APIView):
         # Входящий X-User-ID игнорируем: сервер ищется по server_id и текущему
         # пользователю (JWT), в сервис уходит request.user.public_id (UUID).
         try:
-            server_id_int = int(server_id)
-        except (TypeError, ValueError):
-            return JsonResponse(
-                {'error': f'Server with id={server_id} not found or access denied'},
-                status=404,
-            )
-
-        try:
-            server = get_owned_server(request, server_id_int)
-        except Exception:
+            server = get_owned_server(request, server_id)
+        except NotFound:
             return JsonResponse(
                 {'error': f'Server with id={server_id} not found or access denied'},
                 status=404,

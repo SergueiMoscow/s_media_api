@@ -15,13 +15,23 @@ def get_server_by_id(server_id: int) -> Server:
     return server
 
 
-def get_owned_server(request, server_id: int) -> Server:
+def get_owned_server(request, server_id) -> Server:
     """Сервер текущего пользователя, иначе 404.
 
     Единая точка проверки владельца узла: если сервера нет или он принадлежит
     другому пользователю, поднимается NotFound (404) — так клиент не может
     отличить «нет такого сервера» от «сервер чужой».
+
+    `server_id` может прийти из URL (int) или из тела/query (строка). Приводим
+    к int здесь же: `None`, не число или `bool` → 404 (не 500).
     """
+    if isinstance(server_id, bool):
+        raise NotFound(detail='Server not found')
+    try:
+        server_id = int(server_id)
+    except (TypeError, ValueError):
+        raise NotFound(detail='Server not found')
+
     server = Server.objects.filter(id=server_id, user_id=request.user.id).first()
     if server is None:
         raise NotFound(detail='Server not found')

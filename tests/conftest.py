@@ -21,6 +21,7 @@ def get_fake_response(faker):
         content = '{"files": [{"created_at": ""}]}'
         status_code = 200
         headers = {'Content-Type': 'application/json'}
+
     return FakeResponse
 
 
@@ -52,12 +53,28 @@ def mock_request(get_fake_response):
 
 
 @pytest.fixture
+def node_stream_factory():
+    """Фабрика фейкового потокового ответа узла (для requests.get)."""
+
+    class FakeNodeStream:
+        def __init__(self, status_code=200, headers=None, body=b''):
+            self.status_code = status_code
+            self.headers = headers or {}
+            self._body = body
+
+        def iter_content(self, chunk_size):
+            for i in range(0, len(self._body), chunk_size):
+                yield self._body[i : i + chunk_size]
+
+        def close(self):
+            pass
+
+    return FakeNodeStream
+
+
+@pytest.fixture
 def created_user_and_server(auth_user):
-    server = Server(
-        user=auth_user,
-        name='test server',
-        url='http://test.com'
-    )
+    server = Server(user=auth_user, name='test server', url='http://test.com')
     server.save()
     return server
 
@@ -65,10 +82,13 @@ def created_user_and_server(auth_user):
 @pytest.fixture
 def created_multiple_servers(auth_user, faker):
     count_servers = faker.random_int(min=2, max=10)
-    servers = [Server(
-        user=auth_user,
-        name=faker.bothify(text='test server #####'),
-        url=f'http://{faker.word()}_test.com'
-    ) for _ in range(count_servers)]
+    servers = [
+        Server(
+            user=auth_user,
+            name=faker.bothify(text='test server #####'),
+            url=f'http://{faker.word()}_test.com',
+        )
+        for _ in range(count_servers)
+    ]
     Server.objects.bulk_create(servers)
     yield servers

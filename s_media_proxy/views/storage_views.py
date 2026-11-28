@@ -22,11 +22,7 @@ class StorageListViewSet(APIView, ProxyViewMixin):
         errors = []
         server_id = request.query_params.get('server_id')
         if server_id:
-            try:
-                server_id_int = int(server_id)
-            except (TypeError, ValueError):
-                raise NotFound(detail='Server not found')
-            server = get_owned_server(request, server_id_int)
+            server = get_owned_server(request, server_id)
             data = self.fetch_storages(request, server)
             if data:
                 results.extend(data.get('results', []))

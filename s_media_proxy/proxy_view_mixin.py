@@ -43,6 +43,11 @@ def _mask_data(value):
     return value
 
 
+def _base_url(url: str) -> str:
+    """URL без query-строки — в ней могут быть имена файлов."""
+    return url.split('?', 1)[0]
+
+
 class ProxyViewMixin(ABC):
     timeout_proxy_request: int = 60
 
@@ -112,12 +117,16 @@ class ProxyViewMixin(ABC):
                     merged = {**request.data, **(server_fields or {})}
                     if merged:
                         out_json = merged
+            elif server_fields and not is_get_or_delete:
+                # Тело не JSON и не multipart (например, без тела или
+                # application/x-www-form-urlencoded) — серверные поля шлём JSON.
+                out_json = server_fields
 
         if not forward_request_body and server_fields and not is_get_or_delete:
             out_json = server_fields
 
         # Логгируем детали запроса перед его выполнением (ключи маскируем).
-        logger.info(f'Proxy request: {method_upper} {request_url}')
+        logger.info(f'Proxy request: {method_upper} {_base_url(request_url)}')
         if out_data:
             logger.debug(f'Proxy request data: {_mask_data(out_data)}')
         if out_json:
@@ -130,16 +139,33 @@ class ProxyViewMixin(ABC):
         # Соединение переоткроется лениво при следующем обращении к ORM.
         connection.close()
 
-        proxy_response = requests.request(
-            method_upper,
-            request_url,
-            data=out_data,
-            files=request.FILES,
-            json=out_json,
-            headers=request_header,
-            timeout=self.timeout_proxy_request or timeout,
-            verify=verify,
-        )
+        try:
+            proxy_response = requests.request(
+                method_upper,
+                request_url,
+                data=out_data,
+                files=request.FILES,
+                json=out_json,
+                headers=request_header,
+                timeout=self.timeout_proxy_request or timeout,
+                verify=verify,
+            )
+        except requests.Timeout:
+            logger.warning(f'Proxy timeout: {method_upper} {_base_url(request_url)}')
+            return HttpResponse(
+                json.dumps({'detail': 'Gateway Timeout'}),
+                status=504,
+                content_type='application/json',
+            )
+        except requests.ConnectionError:
+            logger.warning(
+                f'Proxy connection error: {method_upper} {_base_url(request_url)}'
+            )
+            return HttpResponse(
+                json.dumps({'detail': 'Bad Gateway'}),
+                status=502,
+                content_type='application/json',
+            )
         logger.info(f'Proxy response status code: {proxy_response.status_code}')
 
         response = HttpResponse(

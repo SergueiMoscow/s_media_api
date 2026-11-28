@@ -99,20 +99,31 @@ docs/                  # PROJECT.md, INTEGRATION.md
   серверных полей: тело клиента кладётся первым, поверх него — поля сервера
   (`user_id`, `created_by`, `storage_id`, `ip`), так что подделать их из тела
   нельзя. Переданный словарь не мутируется. Если тело не словарь, а вид ждёт
-  словарь с серверными полями — 400.
+  словарь с серверными полями — 400. Серверные поля шлются даже если тело не
+  JSON и не multipart (POST без тела, `application/x-www-form-urlencoded`).
 - `files=request.FILES` — проброс файлов.
 - `timeout` — берётся из атрибута вьюхи `timeout_proxy_request` (по умолчанию 60).
 - `verify` — по умолчанию `True` (self-signed сертификаты узлов — см.
   подводные камни).
+- Сетевые ошибки: `requests.Timeout` → 504, `requests.ConnectionError` → 502
+  (JSON `{"detail": "..."}`); в лог — warning с URL без query-строки и без ключей.
 - `connection.close()` — перед блокирующим `requests.request` закрывается соединение
   к БД, чтобы не удерживать его на время прокси-вызова (защита от исчерпания
   `max_connections` при множестве параллельных запросов, например миниатюр
   анализатора). Соединение переоткрывается лениво при следующем обращении к ORM.
 - Секретные поля (`key`, `api_key`, `password`, …) маскируются в debug-логах.
 
+Потоковая отдача файлов: `/file/…` и `/preview/…` (`BaseFileViewSet`) не буферизуют
+ответ узла — пробрасывают `Range`/`If-Range`, ходят в узел со `stream=True`
+(таймаут `(connect=5, read=60)`), отдают `StreamingHttpResponse` чанками 64 КБ и
+пробрасывают `Content-Range`/`Accept-Ranges`/`Last-Modified`/`ETag`/`Cache-Control`.
+
 Универсальный прокси в анализатор — `AnalyzerProxyView`
 (`s_media_proxy/views/analyzer_views.py`): поддерживает GET/POST/PUT/PATCH/DELETE
-и пробрасывает query-string как есть. Подробнее — `docs/INTEGRATION.md`.
+и пробрасывает query-string как есть. Внутренние пути (`persons/sync`,
+`scanned-files/catalog-links`, `catalog-files/<uuid>/link`) закрыты (404), а из
+ответа `POST /clusters/<id>/assign` вырезается `reference_embedding`. Подробнее —
+`docs/INTEGRATION.md`.
 
 ---
 
@@ -136,8 +147,8 @@ docs/                  # PROJECT.md, INTEGRATION.md
 | `GET /storage/<server_id>/<storage_id>/` | содержимое хранилища |
 | `GET /folders_image?folders=N` | генерация PNG-коллажа папок (локальная генерация, без JWT) |
 | `GET /folder_collage/<server_id>/<storage_id>/` | коллаж папки |
-| `GET /preview/<server_id>/<storage_id>/` | превью файла (без JWT) |
-| `GET /file/<server_id>/<storage_id>/` | файл (без JWT) |
+| `GET /preview/<server_id>/<storage_id>/` | превью файла (без JWT, стриминг + `Range`) |
+| `GET /file/<server_id>/<storage_id>/` | файл (без JWT, стриминг + `Range`) |
 | `POST /storage/fileinfo/<server_id>/<storage_id>/` | добавить/изменить данные файла в каталоге |
 | `GET /catalog/tags/<server_id>/` | теги сервера |
 | `GET /main/` | главная страница (последние файлы по всем серверам, без JWT) |
@@ -221,8 +232,9 @@ python manage.py makemigrations --settings django_app.settings_tests --check --d
   анализатора — `Server.analyzer_api_key`; оба `write_only` в сериализаторе и не
   возвращаются наружу.
 - **Проверка владельца** — единая функция `get_owned_server(request, server_id)`
-  (`s_media_proxy/repository.py`): сервера нет или он чужой → 404. Используется
-  во всех вьюхах, где `server_id` приходит из адреса/тела.
+  (`s_media_proxy/repository.py`): сервера нет, он чужой или `server_id`
+  некорректен (`None`, не число, `bool`) → 404. Используется во всех вьюхах,
+  где `server_id` приходит из адреса/тела.
 - **Прокси-вьюхи** — тонкие: решают узел по `server_id`, строят URL, вызывают
   `_proxy_request`, при необходимости обогащают ответ (`server_id`,
   `server_name`, `server_url`).
@@ -244,3 +256,7 @@ python manage.py makemigrations --settings django_app.settings_tests --check --d
 - По умолчанию всё закрыто (`IsAuthenticated`); открыты только `/api/token/*`,
   `/main/`, `/preview/…`, `/file/…`, `/folders_image` — проверяй `permission_classes`
   каждой вьюхи отдельно.
+- **`Range`/стриминг в nginx (stage)**: `/file/…` и `/preview/…` отдают видео
+  потоком. Чтобы перемотка работала, nginx на stage должен не буферизовать
+  (`proxy_buffering off`) и пробрасывать `Range`/`Accept-Ranges` — это зона
+  деплой-агента, передать ему в отчёте.

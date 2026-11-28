@@ -1,3 +1,5 @@
+import json
+import uuid
 from unittest.mock import patch
 
 import pytest
@@ -145,3 +147,56 @@ def test_proxy_closes_db_connection_before_http_request(
 
     assert response.status_code == status.HTTP_200_OK
     assert events == ['db_close', 'http_request']
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    'path',
+    [
+        'persons/sync',
+        'scanned-files/catalog-links',
+        f'catalog-files/{uuid.uuid4()}/link',
+        '//persons/sync',
+        'Persons/Sync',
+    ],
+)
+def test_analyzer_internal_paths_blocked(authorized_client, server_with_analyzer, path):
+    with patch('requests.request') as mock_req:
+        response = authorized_client.put(f'/analyzer/{server_with_analyzer.id}/{path}')
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    mock_req.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_analyzer_assign_strips_reference_embedding(
+    authorized_client, server_with_analyzer
+):
+    payload = {
+        'cluster_id': 1,
+        'person_id': str(uuid.uuid4()),
+        'faces_updated': 5,
+        'reference_embedding': [0.1] * 512,
+        'files_to_promote': [],
+    }
+
+    class FakeResponse:
+        pass
+
+    fake = FakeResponse()
+    fake.content = json.dumps(payload)
+    fake.status_code = 200
+    fake.headers = {'Content-Type': 'application/json'}
+
+    with patch('requests.request', return_value=fake):
+        response = authorized_client.post(
+            f'/analyzer/{server_with_analyzer.id}/clusters/1/assign',
+            data={'person_id': str(uuid.uuid4()), 'name': 'Alice', 'promote': False},
+            format='json',
+        )
+
+    assert response.status_code == status.HTTP_200_OK
+    data = json.loads(response.content)
+    assert 'reference_embedding' not in data
+    assert data['cluster_id'] == payload['cluster_id']
+    assert data['faces_updated'] == payload['faces_updated']
+    assert data['person_id'] == payload['person_id']
